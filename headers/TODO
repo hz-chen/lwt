@@ -26,66 +26,27 @@ struct lwt_kthd_tcb{
 
 typedef struct lwt_kthd_tcb * lwt_kthd_t;
 
-2: modification in exam.c(Prof.'s test file)
-in function test_grpwait, I changed the last for loop from
-
-
-	for (i = 0 ; i < grpsz ; i++) {
-		lwt_cgrp_rem(g, cs[i]);
-		lwt_join(ts[i]);
-		lwt_chan_deref(cs[i]);
-	}
-
-
-into:
-
-
-	for (i = 0 ; i < grpsz ; i++) {
-		lwt_cgrp_rem(g, cs[i]);
-		//This is something I changed in the main function.
-		lwt_chan_deref(cs[i]);
-		lwt_join(ts[i]);
-	}
-
-The reason is, if we join the thread i first, then deref the channel later, the program
-will falls into a dead loop and finally everyone is waiting for each other. Detailed 
-analysis like:
-
-	thread 0 join thread 1, so thread 0 WAIT until the finish of thread 1;
-	but all the other threads are blocked for thread 0 to receive data;
-	thread 1 also trys send a data to 0, so it will tries to wake thread 0 up;
-	However thread 0 refuse to wake up because the join operation does not succeed.
-	--deadloop---
-
-if we deref the channel first, then join the child thread, the scenario will looks like:
-	every other threads are blocked and waiting for thread 0 to receive data;
-	thread 0 defer channel for thread 1, so thread 1 back into ready queue.
-	Now thread 0 joins thread 1, successed.
-
-3: Monitor lwt thread in kthd 0
+2: Monitor lwt thread in kthd 0
 	I seperate the function of monitoring ring buffer into a function called:
 	__lwt_kthd_rbuf_monitor. When a kthd calls lwt_kthd_create, this function will firstly
 	create an additional lwt thread, using this function as routing function to monitor
 	the ring buffer of itself.
 
-4: a lot concurrency issue solved:
+3: a lot concurrency issue solved:
 	Now inter kthd scheduling(basically inter kthd cgrp_wait) works perfectly. The only
 	thing is we need to add a sleep() function at the end of main thread, so it will not
 	exit before child kthd finish their job.
 	But the drawback of adding all these atomic instructions and memory barriers made my
 	performance of SND/RCV one time slower than it was before.
 
-4.5: however... I think I need more time to fix them.
+3.5: however... I think I need more time to fix them.
 
-5: about kp manager:
-	Well... I discovered this requirement 5 mins ago... I think if I want to implement these
-	functions, I need to create additional variables in kthd_tcb structure. and an additional
+4: about kthread pool manager:
+	I think I need to create additional variables in kthd_tcb structure. and an additional
 	global variable indicating how many kthds are avaliable. This variable, say may be named 
 	idle_kthd_cnter, can only been update by the monitor thread or each kthd. for each kthd, 
 	if there is only one active lwt thread (length_of_rdyq == 0), I mark myself as idle; if 
 	I was not idle, then g_atom_int_dec_and_test(idle_kthd_cnter); otherwise just keep checking
 	the ring buffer until someone send me DESTROY signal onto my ring buffer or other commands.
 
-6: my coding repository is at: 
-	https://code.google.com/p/light-weighted-multi-thread-library/source/browse/#svn%2Ftrunk%2Fheaders
 

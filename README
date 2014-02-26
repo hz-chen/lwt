@@ -1,0 +1,27 @@
+This is my personal multi-thread library, it's a improvement of pthread 
+(at least I think so) and an extension from my Adv. OS project.
+
+It's a M:N mapping from user level threads and kernel level threads.
+
+In user level, it uses cooperative scheduling between threads, like 
+what Mac did before Mac OS X. 
+
+The user threads are light-weighted and super fast, and inter-thread 
+communication are convinence because the support of channel communication.
+
+In kernel level, it basically runs on pthread, while the lwt library has 
+a build-in data structure to manage all the pthread instance, so
+the user may not even notice the existance of pthread.
+
+The kernel threads are relatively heavy, and I also made inter-kthread
+channel for inter-thread communication and we can even pass a user-level
+thread to another kernel thread through the channel.
+
+Making the code requires the glib library. Because in order to maintain the
+high performance, I tried my best to avoid using locks and mutexes while doing
+the inter-kthread communication, so what I did is to use as much atomic 
+operations in the glib as possible.
+
+This library is not perfect (definitely), and has a lot bugs (of course), and
+is still under construction.
+
