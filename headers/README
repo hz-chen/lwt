@@ -1,0 +1,25 @@
+how to use:
+make: 
+	will simply make main.c, which is a simple stupid application.
+
+	the main.c.2 is my original test file, you can try to edit Makefiel, turn the $(O_FLAGS) into 
+	$(DBG_FLAGS) to see more verbose output.
+make exam: 
+	professor's test file with DBG symbol
+make final: 
+	professor's test file with -O3.
+make lib:
+	need to run this under root, will generate a library file and cp'ed into /usr/lib.
+	However some bug exists, when compile with -llwt it says:
+
+	/usr/bin/ld: warning: type and size of dynamic symbol `__lwt_trampoline' are not defined
+	/usr/bin/ld: dynamic variable `__lwt_trampoline' is zero size
+	/usr/bin/ld: warning: type and size of dynamic symbol `__lwt_dispatch' are not defined
+	/usr/bin/ld: dynamic variable `__lwt_dispatch' is zero size
+	/usr/bin/ld: /tmp/ccJBJLoz.o(.text+0xbf8): unresolvable R_386_PC32 relocation against symbol `__lwt_dispatch'
+	/usr/bin/ld: final link failed: Nonrepresentable section on output
+	collect2: ld returned 1 exit status
+	make: *** [run] Error 1
+
+where __lwt_trampoline and __lwt_dispatch are assembly functions, I don't know how to solve this.
+

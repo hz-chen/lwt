@@ -1,0 +1,117 @@
+/*******************************************
+*
+* Author: Hongzhou Chen - hzchen_cs@gwmail.gwu.edu
+*
+*
+* Last modified:	12-04-2013 16:27
+*
+* Filename:		lwt_core.S
+*
+* Description: 		Assembly functions used for lwt library.
+*					These two functions are the core of the core.
+*
+******************************************/
+
+.text
+.align 16
+.globl __lwt_trampoline
+__lwt_trampoline:
+	call __lwt_start
+	pushl %eax
+	call lwt_die
+	// will cause a fault...you should never get here!
+	movl $0, %eax
+	movl (%eax), %ebx
+
+	
+/**
+ *	Call this function like __lwt_dispatch(lwt_tcb* next_tcb, lwt_tcb* curr_tcb)
+ */
+.align 16
+.globl __lwt_dispatch
+__lwt_dispatch:
+	pushl %ebp 	
+	movl %esp, %ebp
+	pusha				//push 8 registers, takes 32 bytes.
+	movl 0x2c(%esp), %eax		//got curr_tcb, 8 more bytes earlier;
+	movl %esp, 0x10(%eax)		//movl %esp, curr_tcb->lwt_esp
+	movl %ebp, 0xc(%eax)		//movl %ebp, curr_tcb->lwt_ebp
+	movl $1f, 0x14(%eax)			//movl %eip, curr_tcb->lwt_eip
+	movl 0x28(%esp), %eax	//got next_tcb
+	movl 0x10(%eax), %esp	//movl $next_tcb->lwt_esp, %esp
+	movl 0xc(%eax), %ebp 	//movl curr_tcb->lwt_ebp, %ebp
+	movl 0x14(%eax), %ebx	//movl $next_tcb->lwt_eip, %ebx
+	jmp *%ebx
+	1:
+	popa
+	leave
+	ret
+
+
+#if 0
+
+/**
+ *	I tried to make the double linked list operation into pure assembly,
+ *	but somehow it's slower than the -03 compiler >_<
+ *	I'll refine this later.
+ *	0x8(ebp):	value of target_index
+ *	%eax: whatever
+ *	%ebx: address of lwt_rdyq_head/tail
+ *	%ecx: 
+ *	%edx: address of target_tcb = lwt_lst_root[target]
+ */
+
+//__lwt_remove_from_rdyq_S(target)
+.align 16
+.globl __lwt_remove_from_rdyq_S
+__lwt_remove_from_rdyq_S:
+	pushl %ebp
+	movl %esp, %ebp
+	pusha						//save registers
+	movl 0x8(%ebp), %edx		//%edx: target tcb index
+	shl $0x6, %edx				//%edx = %edx * 64
+	addl $lwt_lst_root, %edx	//address of target_tcb
+	movl $lwt_rdyq_head, %ebx	//address of lwt_rdyq_head
+	movl (%ebx), %eax
+	cmp 0x8(%ebp), %eax			//if target == lwt_rdyq_head
+	jne else_tail
+		movl 0x8(%edx), %eax	//%eax = target_tcb->rdyq_next
+		movl %eax, (%ebx)		//lwt_rdyq_head = target_tcb->rdyq_next
+		movl (%ebx), %eax		//value of lwt_rdyq_head
+		shl $0x6, %eax			//offset of lwt_rdyq_head
+		addl $lwt_lst_root, %eax	//%eax = lwt_lst_root[lwt_rdyq_head]
+		movl $0xffffffff, 0x4(%eax)	//lwt_lst_root[lwt_rdyq_head].rdyq_prev= _LWT_NULL
+	jmp end
+else_tail:
+	movl $lwt_rdyq_tail, %ebx
+	cmp %eax, %ebx						//else if target == lwt_rdyq_tail
+	jne else_default
+		movl 0x4(%edx), %eax		//%eax = target_tcb->rdyq_prev
+		movl %eax, (%ebx)			//lwt_rdyq_tail = target_tcb->rdyq_prev
+		movl (%ebx), %eax			//value of lwt_rdyq_tail
+		shl $0x6, %eax				//offset of lwt_rdyq_tail
+		addl $lwt_lst_root, %eax	//%eax = lwt_lst_root[lwt_rdyq_tail]
+		movl $0xffffffff, 0x8(%eax)	//lwt_lst_root[lwt_rdyq_tail].rdyq_next= _LWT_NULL
+	jmp end
+else_default:										//else
+	movl 0x08(%edx), %eax			//%eax = target_tcb->rdyq_next
+	movl %eax, %ecx					//%ecx = target_tcb->rdyq_next
+	shl $0x6, %ecx					//%ecx = absolute offset
+	addl $lwt_lst_root, %ecx		//%ecx = lwt_lst_root[target_tcb->rdyq_next]
+	movl %eax, 0x08(%ecx)			//%ecx->rdyq_next = %eax
+
+	movl 0x4(%edx), %eax			//%eax = target_tcb->rdyq_prev
+	movl %eax, %ecx					//%ecx = target_tcb->rdyq_prev
+	shl $0x6, %ecx					//%ecx = absolute offset
+	addl $lwt_lst_root, %ecx		//%ecx = lwt_lst_root[target_tcb->rdyq_next]
+	movl %eax, 0x4(%ecx)			//%ecx->rdyq_prev = %eax
+end:										//end 
+	movl $0xffffffff, 0x08(%edx)	//target_tcb->rdyq_next = _LWT_NULL
+	movl $0xffffffff, 0x4(%edx)	//target_tcb->rdyq_prev = _LWT_NULL
+	movl $length_of_rdyq, %eax
+	subb $1, (%eax)					//length_of_rdyq--
+	popa
+	leave
+	ret
+
+#endif
