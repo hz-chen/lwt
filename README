@@ -1,5 +1,8 @@
 This is my personal multi-thread library, it's a improvement of pthread 
-(at least I think so) and an extension from my Adv. OS project.
+(at least I think so) and an extension from my Adv. OS project. 
+
+Mr. Gabriel Parmer is the professor of the class, thanks a lot for all
+he tought me.
 
 It's a M:N mapping from user level threads and kernel level threads.
 
