@@ -351,7 +351,7 @@ lwt_cgrp_free(lwt_cgrp_t cg)
 	
 	lwt_t waiter = cg->snd_waiter;
 
-	//TODO: need to check what the waiter is waiting for. Fix it!
+	//TODO: need to check what the waiter is waiting for.
 	if((waiter != _LWT_NULL) && (lwt_lst_root[waiter].lwt_status == _LWT_STAT_WAIT))
 	{
 		lwt_lst_root[waiter].lwt_status = _LWT_STAT_RDY;

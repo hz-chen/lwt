@@ -8,8 +8,8 @@
  * Filename:			lwt_core.h
  *
  * Description:  	contains core functions that are needed
- * 					by the lwt library. This is the core header 
- * 					file, no user should include this one.
+ * 			by the lwt library. This is the core header 
+ * 			file, no user should include this one.
  *
  * functions:
  *				__lwt_get_target
