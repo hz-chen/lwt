@@ -1,0 +1,19 @@
+/*******************************************
+*
+* Author: HzChen - hzchen_cs@gwmail.gwu.edu
+*
+*
+* Last modified:	03-04-2014 14:00
+*
+* Filename:		CHANGELOG
+*
+* Description: 
+*
+*
+******************************************/
+
+
+3/4/14
+I've made a lot changes and heavily optimized the create/join part, although might made some additional bugs.
+Now it takes average 150 cpu cycles to finish done a create/join operation, and the create function is throughly tested.
+
