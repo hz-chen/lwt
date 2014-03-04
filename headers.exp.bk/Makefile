@@ -1,0 +1,25 @@
+HEADER_FILES=$(wildcard *.h)
+ASM_FILES=$(wildcard *.S)
+COMM_FLAGS=-Wall 
+PROF_FLAGS=-pg -lc -g
+DBG_FLAGS=-g -DDBG 
+O_FLAGS=-O3
+LIBS=-lpthread
+main: $(HEADER_FILES)  $(ASM_FILES) main.c 
+	gcc $^ $(COMM_FLAGS) -g -o $@ $(LIBS)
+
+exam: $(HEADER_FILES) $(ASM_FILES) exam.c
+	gcc $^ $(COMM_FLAGS) $(DBG_FLAGS) -o $@ $(LIBS)
+
+final: $(HEADER_FILES) $(ASM_FILES) exam.c
+	gcc $^ $(COMM_FLAGS) $(O_FLAGS) -o $@ $(LIBS)
+
+lib:  $(HEADER_FILES) $(ASM_FILES)
+	gcc  $(COMM_FLAGS) -fPIC -c $^ $(LIBS)
+	gcc -o liblwt.so.1.0   *.o -shared
+	cp liblwt.so.1.0 /usr/lib
+	ln -sf /usr/lib/liblwt.so.1.0 /usr/lib/liblwt.so.1
+	ln -sf /usr/lib/liblwt.so.1.0 /usr/lib/liblwt.so
+
+clean: 
+	rm -rf exam main final *.o 

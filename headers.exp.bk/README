@@ -1,0 +1,150 @@
+/*******************************************
+*
+* Author: HzChen - hzchen_cs@gwmail.gwu.edu
+*
+*
+* Last modified:	03-02-2014 13:22
+*
+* Filename:		README
+*
+* Description: 	general API
+*
+*
+******************************************/
+
+General background: 
+	This is a multi-thread library. I haven't tested all the functions into every detail yet, but at least it's a working library and most functionalities are working :)
+	lwt stands for Light Weighted Thread. They are cooperative scheduled user level threads. All of them are running on single kernel thread and when to stop is in programmer's hand. They are super fast and light-weighted, you can create as much of them as you want. Currently I make it up to 1024 lwt threads per kthread, but I believe it's just the matter of buffer size.
+	Following is the API:
+
+lwt_create: create a lwt user level thread. 
+	When a thread is newly created, it is in ready queue with RDY status (yield).
+	parameters:
+		lwt_fn_t fn: routing function, defined in lwt_types.h.
+		void* data: data passed to fn function.
+		int flag:	whether this thread need to join
+		lwt_chan_t c:	channel which the thread can receive.
+
+lwt_yield:	yield current thread and call scheduler.
+	This is just a suggestion to scheduler to wake target thread. If the target is not eligible for wake up, then the scheduler will wake up an eligible one (even the caller itself).
+	parameters:
+		lwt_t target: lwt_t of target thread.
+		
+lwt_join:	join target thread. 
+	An successful join will block current thread, and switch to target thread. This thread will only be awake by the termination of target thread, all other requests to current thread will be blocked. 
+	Only parent thread can join child thread, and the child thread must not been market as LWT_FLAG_NOJOIN, otherwise it will just simply yield to target thread.
+	parameters:
+		lwt_t target: lwt_t of target thread.
+
+lwt_die:	suicide.
+	A thread will automaticall call this function after the returning of routing function. If user manually calls this function in a thread, it will kill it self.
+	Parameters:
+		void* retVal: a pointer points to a location to hold the return value.
+
+lwt_current:	get current tid
+	simply get current tid.
+
+lwt_info:	An auxiliary function, get current running status.
+	lwt_info_t info:	what info do you want?
+
+lwt_kthd_create:	create a kernel thread.
+	This function creates both a kernel-scheduled thread (pthread) and a lwt thread that is created to run on that kthread. That lwt thread on the kthd calls the fn as with the normal lwt create API sending the data and delegated channel as normal. The difference here is that the lwt thread is executing on a separate kthd. Note that we no longer return a lwt_t. Instead, return 0 if we successfully create the thread, and -1 otherwise.
+	The creation of a kernel thread begins from creating a monitor lwt thread running on it. The monitor lwt thread will act as lwt id 0, which keep checking the event buffer and in charge of the overall scheduling. Since this monitor lwt thread will not run the routing function, another real working lwt thread will been created to run the routing function. 
+	There is no flag parameter past into the new lwt thread on kthd thread, because by default it would be LWT_FLAG_NOJOIN. 
+	Parameters:
+		lwt_fn_t fn: routing function.
+		void* data: parameter of the routing function.
+		lwt_chan_t c:	a channel which the working lwt thread on the new kthread can receive on. This is the default way to pass message to the new lwt thread.
+
+lwt_chan:	create a channel.
+	This function creates a channel referenced by the return value. The memory will be freed by lwt_chan_deref. The channel can be both synchronized or asynchronized. 
+	Channel is something fantastic for inter-thread communication. Each channel is pretty much like a twitter account: it has one receiver and multiple senders. It has a ring buffer, one consumer and multiple producer. The channel can be delegated, means the owner of the channel can "gift" the channel to another thread, then that thread becomes the receiver and owner of the channel. The channel can also be used to communicate between different lwt thread on different kthread.
+	Channel can be both synchronized an asynchronized, depends on the buffer size when the channel is created. 
+	If it is a synchronized channel, then when the sender wants to send a message through the channel, it will be blocked and wait until the receiver fetch out the message from the channel; and when the receiver wants to receive a message from the channel, it will also be blocked and wait a message appare in the channel to wake it up.
+	Parameter:
+		int sz:	size of buffer in the channel. If the sz is 0, then it's an synchronized channel; other wise it will be an asynchronized channel.
+
+lwt_chan_deref:	dereference a channel.
+	This function dereference a channel safely. If the receiver of the channel calls the method, the channel will become nolonger sendable. After all senders and the receiver call the deref method, the channel will be freed.
+	Parameter: 
+		lwt_chan_t c: the channel you don't want to use anymore.
+
+lwt_snd: send a data into a channel.
+	This function is a blocking function. It will put data pointer into the channel buffer. If: 1) the channel buffer is full; 2) the channel has buffer size 0, then the caller will be blocked. The only way to unblock the thread is the receiver of the channel receives a piece of data, so there is one avaliable space in the buffer, and the sending thread stands in the front of all blocked sender's queue.
+	Parameters:
+		lwt_chan_t c:	channel you want to send to.
+		void* data:	pointer to data you want to pass.
+
+lwt_rcv: receive data from a channel.
+	This function is a blocking function and only can be called by the receiver of the channel. It will either return the pointer of the data if the call is succeed, or nil if the caller is not the receiver/owner of the channel.
+	It will be blocked if: 1) the channel buffer is empty; 2) the channel has buffer size 0. Once the caller is blocked, the only way to unblock it is someone send a piece of data into the channel. 
+	Parameters:
+		lwt_chan_t c:	channel you want to receive at.
+
+lwt_snd_chan:	send a channel through a channel.
+	This function likes the lwt_snd function except a channel is send through a channel. Technically so far it has nothing different from sending a regular data, but I think it might be useful in the future.
+	Parameters:
+		lwt_chan_t sender:	channel you want to send the sendee through.
+		lwt_chan_t sendee:	channel you want to send through the sender.
+
+lwt_rcv_chan:	receive a channel from a channel.
+	This function likes the lwt_rcv function except a channel is received through a channel. Technically so far it has nothing different from receiving a regular data, but I think it might be useful in the future.
+	Parameters:
+		lwt_chan_t c:	channel you want to receive from.
+
+lwt_chan_mark_set:	mark a channel
+	The channel has a customized mark, user can set any mark for the channel for convinence.
+	Parameters:
+		lwt_chan_t c:	channel you want to mark.
+		void* mark:	how do you like to mark the channel?
+
+lwt_chan_mark_get:	get the mark of the channel.
+	The channel has a customized mark, user can get the mark which is previously set by user.
+	Parameters:
+		lwt_chan_t c:	channel you want to get the mark from.
+
+lwt_snd_cdeleg:	delegate the channel delegating to another thread through a channel c.
+	This function will make the caller thread a sender of channel c, and change the ownership of channel delegating from current thread to the receiver of channel c.
+	Parameters:
+		lwt_chan_t c:	channel you want to pass the channel through.
+		lwt_chan_t delegating: the channel been delegated.
+	
+lwt_rcv_cdeleg: receive a delegated channel from channel c.
+	Parameters:
+		lwt_chan_t c:	channel you want to receive from.
+	
+/*****I think I can merge lwt_rcv, lwt_rcv_chan and lwt_rcv_cdeleg into one single lwt_rcv function, and lwt_snd and lwt_snd_chan into one function.*********/
+
+
+lwt_cgrp: create an empty channel group, return the lwt_cgrp_t id of the group.
+	A channel group is a group of channel. Each group contains multiple channels, and one thread waiting for send event, one thread wait for receive event, two event ring buffers, one is for send event, and one is for receive event. 
+	The "send event" and "receive event" means two different types of event. For example, assume we have multiple channels in a channel group. Once a channel in the channel group becomes receivable, means probably someone else send a piece of data through the channel, then a RECEIVE event will be triggered and put into the receive event ring buffer. Then the thread waiting for receive event will be wake up, and get the receivable channel. The channel will remains in the channel group unless been manually removed.
+	The purpose of channel group is to implement multi-wait. By default, when a new channel has been added into a channel group and there is no data in it, means it is sendable, then it will trigger a SEND event; if the new channel has contains pending data, means is receivable, then trigger a RECV event.
+	Parameters:
+		null.
+
+lwt_cgrp_free:	try to free a channel group.
+	Free a channel group and return 0 only if there are no pending events. If there are pending events, return -1, and do not delete the channel group.
+ 	This function will not free the associated channels.
+	Parameters:
+		lwt_cgrp_t cg:	channel group that we attemped to free.
+
+lwt_cgrp_add:	try to add a channel to a channel group.
+	Each channel has two type of event: send and receive. a channel can belongs to two different channel groups which notifies different type of event. If you want to add notify a group with all event, you can call this method twice.
+	Parameters:
+		lwt_cgrp_t cg:	The channel group want to added to.
+		lwt_chan_t c:	The channel want to add.
+		lwt_chan_dir_t type:	which direction of event do you want to notify the channel group?
+
+lwt_cgrp_rem:	remove a channel from a channel group.
+	No matter what direction the channel is, the channel will no longer has any relationship with the channel group, it will stop notify any event to the channel group. But will not influence other channel group of the channel.
+	Parameters:
+		lwt_cgrp_t cg:	The channel group you want to remove from.
+		lwt_chan_t c:	the targert channel.
+
+lwt_cgrp_wait:	waiting on a channel group for specific event type, return the related channel.
+	This is a blocking function. Calling thread will be blocked until the waited event has been triggered and the target channel been returned.
+	Parameters:
+		lwt_cgrp_t cg:	The channel group you're waiting on.
+		lwt_chan_dir_t type:	what type of event you're waiting for? The type can be either SEND or RECEIVE or even NULL. If this parameter is NULL, then the function will return the firstly check any event on receive event buffer, then check the send event buffer, and once any event has been found, the event will been removed and related channel will be returned.
+
