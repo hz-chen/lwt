@@ -47,10 +47,7 @@ lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
 	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
 	{
 		lwt_lst_tail=0;
-		lwt_rdyq_head=nil_tcb;
-		lwt_rdyq_tail=nil_tcb;
-		lwt_dead_head=nil_tcb;
-		lwt_dead_tail=nil_tcb;
+		__init_pool();
 		__init_tcb(0);
 		curr_tcb = &lwt_lst_root[0];
 	}
@@ -99,21 +96,19 @@ void* lwt_join(lwt_t target)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: trying to join thread %d\n",
-			curr_tcb, kthd_index, target);
+			curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 
 
 	_lwt_tcb* target_tcb = target;
 	_lwt_tcb* op_tcb = target_tcb;
 
-	/*
 	if(unlikely(curr_tcb != target_tcb->parent) ||
 		(target_tcb->flag == LWT_FLAG_NOJOIN))
 	{
 		lwt_yield(target);
 		return NULL;
 	}
-	*/
 
 
 	num_of_block++;
@@ -131,11 +126,9 @@ void* lwt_join(lwt_t target)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: target thread %d is in status %d, pick thread %d as operand.\n",
-				curr_tcb, kthd_index, target, target_tcb->lwt_status, operand);
+				curr_tcb->lwt_id, kthd_index, target_tcb->lwt_id, target_tcb->lwt_status, op_tcb->lwt_id);
 #endif
 
-
-//		_lwt_tcb* op_tcb = &lwt_lst_root[operand];
 
 		__lwt_remove_from_rdyq(op_tcb);
 
@@ -145,11 +138,12 @@ void* lwt_join(lwt_t target)
 		__lwt_schedule(op_tcb);
 	}while(target_tcb->lwt_status != _LWT_STAT_ZOMB);
 #ifdef DBG
-	printf("thread %d in kthd %d: killing thread %d\n", curr_tcb, kthd_index, target);
+	printf("thread %d in kthd %d: killing thread %d\n", curr_tcb->lwt_id, kthd_index, target_tcb->lwt_id);
 #endif
 
+
 	curr_tcb->lwt_status = _LWT_STAT_RUN;
-	target_tcb->lwt_status = _LWT_STAT_DEAD;
+	op_tcb->lwt_status = _LWT_STAT_DEAD;
 	num_of_block--;
 	void* ret = target_tcb->ret_val;
 	__lwt_append_into_deadq(target);
@@ -164,7 +158,7 @@ void lwt_die(void* retVal)
 	curr_tcb->ret_val = retVal;
 	curr_tcb->lwt_status = _LWT_STAT_ZOMB;
 #ifdef DBG
-	printf("thread %d in kthd %d: Now I'm a ZOMBIE!!!\n", curr_tcb, kthd_index);
+	printf("thread %d in kthd %d: Now I'm a ZOMBIE!!!\n", curr_tcb->lwt_id, kthd_index);
 #endif
 	num_of_zombie++;
 
@@ -177,7 +171,7 @@ void lwt_die(void* retVal)
 		{
 			num_of_zombie--;
 #ifdef DBG
-			printf("thread %d in kthd %d: I gonna die!!\n", curr_tcb, kthd_index);
+			printf("thread %d in kthd %d: I gonna die!!\n", curr_tcb->lwt_id, kthd_index);
 #endif
 			//let parent go
 			op_tcb = curr_tcb->parent;
@@ -195,7 +189,7 @@ void lwt_die(void* retVal)
 
 #ifdef DBG
 			printf("thread %d in kthd %d: I've been flagged with NOJOIN.\n",
-					curr_tcb, kthd_index);
+					curr_tcb->lwt_id, kthd_index);
 #endif
 
 				curr_tcb->lwt_status = _LWT_STAT_DEAD;
@@ -207,7 +201,7 @@ void lwt_die(void* retVal)
 			{
 #ifdef DBG
 			printf("thread %d in kthd %d: no one joins me.\n",
-					curr_tcb, kthd_index);
+					curr_tcb->lwt_id, kthd_index);
 #endif
 				curr_tcb->lwt_status = _LWT_STAT_ZOMB;
 				__lwt_append_into_rdyq(curr_tcb);

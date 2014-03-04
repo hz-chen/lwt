@@ -3,17 +3,14 @@
 * Author: HzChen - hzchen_cs@gwmail.gwu.edu
 *
 *
-* Last modified:	03-05-2014 05:57
+* Last modified:	03-02-2014 13:22
 *
 * Filename:		README
 *
 * Description: 	general API
-*			This is the optimization working folder.
 *
 *
 ******************************************/
-
-
 
 General background: 
 	This is a multi-thread library. I haven't tested all the functions into every detail yet, but at least it's a working library and most functionalities are working :)

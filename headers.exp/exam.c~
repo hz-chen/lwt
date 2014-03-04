@@ -1,5 +1,5 @@
 #include <stdio.h>
-include <stdlib.h>
+#include <stdlib.h>
 #include <assert.h>
 
 #include "lwt.h"
@@ -72,13 +72,11 @@ test_perf(void)
 	IS_RESET();
 	
 
-	/*
 	chld1 = lwt_create(fn_bounce, (void*)1, 0, 0);
 	chld2 = lwt_create(fn_bounce, NULL, 0, 0);
 	lwt_join(chld1);
 	lwt_join(chld2);
 	IS_RESET();
-	*/
 
 }
 
@@ -413,8 +411,8 @@ int
 main(void)
 {
 	test_perf();
-	/*
 	test_crt_join_sched();
+	/*
 	test_perf_channels(1);
 	test_multisend(0);
 	test_perf_async_steam(ITER/10 < 100 ? ITER/10 : 100);

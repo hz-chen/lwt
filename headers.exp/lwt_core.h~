@@ -116,7 +116,7 @@ int __lwt_get_target()
 	else
 	{
 #ifdef DBG
-		printf("selected %d because dead_head is %d\n", lwt_dead_head, lwt_dead_head);
+		printf("selected %d because dead_head is %d\n", lwt_dead_head->lwt_id, lwt_dead_head->lwt_id);
 #endif
 		return lwt_dead_head->lwt_id;
 	}
@@ -127,7 +127,7 @@ int __lwt_get_target()
 void* __lwt_start(lwt_fn_t fn, void* data, lwt_chan_t c)
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: __lwt_start\n", curr_tcb, kthd_index);
+	printf("thread %d in kthd %d: __lwt_start\n", curr_tcb->lwt_id, kthd_index);
 #endif
 
 	if(c)
@@ -145,11 +145,11 @@ void* __lwt_start(lwt_fn_t fn, void* data, lwt_chan_t c)
 void __lwt_remove_from_rdyq(_lwt_tcb* target)
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: __lwt_rmv_rdyq:\t%d\n",curr_tcb, kthd_index, target);
+	printf("thread %d in kthd %d: __lwt_rmv_rdyq:\t%d\n", curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
-	//assert(length_of_rdyq>0);
-	while(length_of_rdyq == 0)
-		sleep(1);
+	assert(length_of_rdyq>0);
+//	while(length_of_rdyq == 0)
+//		sleep(1);
 	assert((target->lwt_status == _LWT_STAT_RDY)||(target->lwt_status == _LWT_STAT_ZOMB));
 	if(target == lwt_rdyq_head)
 	{
@@ -172,7 +172,7 @@ void __lwt_remove_from_rdyq(_lwt_tcb* target)
 
 
 #ifdef DBG
-	printf("thread %d in kthd %d: after rmv, length_of_rdyq:\t%d\n",curr_tcb, kthd_index, length_of_rdyq);
+	printf("thread %d in kthd %d: after rmv, length_of_rdyq:\t%d\n",curr_tcb->lwt_id, kthd_index, length_of_rdyq);
 #endif
 }
 
@@ -185,7 +185,7 @@ void __lwt_remove_from_rdyq(_lwt_tcb* target)
 void __lwt_append_into_rdyq(lwt_t target)
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: __lwt_add_rdyq: %d\n",curr_tcb, kthd_index, target);
+	printf("thread %d in kthd %d: __lwt_add_rdyq: %d\n",curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 
 #ifdef DBG
@@ -202,14 +202,14 @@ void __lwt_append_into_rdyq(lwt_t target)
 	}else
 	{
 		target->rdyq_next = nil_tcb;
-		target->rdyq_prev = nil_tcb;
+		target->rdyq_prev = lwt_rdyq_tail;
 		lwt_rdyq_tail->rdyq_next = target;
 		lwt_rdyq_tail = target;
 	}
 	length_of_rdyq++;
 #ifdef DBG
 	printf("thread %d in kthd %d: after add, length_of_rdyq:\t%d\n",
-			curr_tcb, kthd_index, length_of_rdyq);
+			curr_tcb->lwt_id, kthd_index, length_of_rdyq);
 #endif
 }
 
@@ -221,7 +221,7 @@ void __lwt_append_into_rdyq(lwt_t target)
 void __lwt_append_into_deadq(lwt_t target)
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: __lwt_add_dq:\t%d\n",curr_tcb, kthd_index, target);
+	printf("thread %d in kthd %d: __lwt_add_dq:\t%d\n",curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 	assert(target->lwt_status==_LWT_STAT_DEAD);
 	if(lwt_dead_head == nil_tcb)
@@ -247,7 +247,7 @@ void __lwt_append_into_deadq(lwt_t target)
 void __lwt_remove_from_deadq()
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: __lwt_rmv_dq:\t%d\n",curr_tcb, kthd_index, lwt_dead_head);
+	printf("thread %d in kthd %d: __lwt_rmv_dq:\t%d\n",curr_tcb->lwt_id, kthd_index, lwt_dead_head->lwt_id);
 #endif
 	assert(length_of_deadq > 0);
 	//this is the default behavior
@@ -274,7 +274,7 @@ __lwt_kthd_rbuf_write(kthd_t index, _lwt_kthd_ctrl_t token, int target_lwt)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: writing event %d to target lwt %d in kthd %d\n",
-			curr_tcb, kthd_index, token, target_lwt, index);
+			curr_tcb->lwt_id, kthd_index, token, target_lwt, index);
 #endif
 	//make sure target thread is completely up.
 	while(unlikely(kthds[index].done_init == 0));
@@ -294,7 +294,7 @@ __lwt_kthd_rbuf_write(kthd_t index, _lwt_kthd_ctrl_t token, int target_lwt)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: after write, kthd_rbuf_len in kthds %d is %d\n",
-			curr_tcb, kthd_index, index, *(kthds[index].kthd_rbuf_len_p));
+			curr_tcb->lwt_id, kthd_index, index, *(kthds[index].kthd_rbuf_len_p));
 #endif
 
 }
@@ -308,7 +308,7 @@ __lwt_kthd_rbuf_read()
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: before read, kthd_rbuf_len in kthds %d is %d\n",
-				curr_tcb, kthd_index, kthd_index, kthd_rbuf_len);
+				curr_tcb->lwt_id, kthd_index, kthd_index, kthd_rbuf_len);
 #endif
 		//at any time under any circumstance, the kthd_rbuf_cons will
 		//only been touched by the thread it belongs to.
@@ -316,7 +316,7 @@ __lwt_kthd_rbuf_read()
 		kthd_rbuf_cons ++;
 #ifdef DBG
 		printf("thread %d in kthd %d: after read, kthd_rbuf_len in kthds %d is %d\n",
-				curr_tcb, kthd_index, kthd_index, kthd_rbuf_len);
+				curr_tcb->lwt_id, kthd_index, kthd_index, kthd_rbuf_len);
 #endif
 
 		struct lwt_kthd_evnt got = (*kthd_ring_buf)[tmp_cons];
@@ -333,9 +333,9 @@ __init_pool()
 	nil_tcb = (_lwt_tcb*)calloc(sizeof(_lwt_tcb), sizeof(_lwt_tcb));
 	lwt_rdyq_head = nil_tcb;
 	lwt_rdyq_tail = nil_tcb;
-	lwt_deadq_head = nil_tcb;
-	lwt_deadq_head = nil_tcb;
-
+	lwt_dead_head = nil_tcb;
+	lwt_dead_head = nil_tcb;
+	curr_tcb = nil_tcb;
 }
 
 
@@ -349,13 +349,11 @@ __init_pool()
 _lwt_tcb* __init_tcb(int id)
 {
 
-	if(unlikely(kthd_self == 0))
+	if((kthd_self == 0))
 		kthd_self = pthread_self();
-	if(unlikely(id == 0))
-		__init_pool();
 
 #ifdef DBG
-	printf("thread %d in kthd %d: I'm in __init_tcb: \t%d\n",curr_tcb, kthd_index, id);
+	printf("thread %d in kthd %d: I'm in __init_tcb: \t%d\n", curr_tcb->lwt_id, kthd_index, id);
 #endif
 	_lwt_tcb* lwt_tmp = (_lwt_tcb*)&(lwt_lst_root[id]);
 
@@ -449,7 +447,7 @@ void  __lwt_schedule(_lwt_tcb* target)
 				target->lwt_status == _LWT_STAT_RUN))
 	{
 		printf("schedule target %d with unexpected status: %d\n",
-				target,
+				target->lwt_id,
 				target->lwt_status);
 		exit(0);
 	}
@@ -457,7 +455,7 @@ void  __lwt_schedule(_lwt_tcb* target)
 
 
 #ifdef DBG
-	printf("thread %d in kthd %d: I'm calling __lwt_schedule:%d\n",curr_tcb, kthd_index, target);
+	printf("thread %d in kthd %d: I'm calling __lwt_schedule:%d\n",curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 
 
@@ -477,7 +475,7 @@ void  __lwt_schedule(_lwt_tcb* target)
 				curr_tcb->lwt_status == _LWT_STAT_RUN))
 	{
 		printf("back from schedule, thread %d with unexpected status: %d\n",
-				curr_tcb,
+				curr_tcb->lwt_id,
 				curr_tcb->lwt_status);
 		exit(0);
 	}
@@ -520,7 +518,7 @@ void __lwt_chan_triger_evnt(lwt_chan_t c, lwt_chan_dir_t type)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: event trigger: %d in channel 0x%08x.\n",
-			curr_tcb, kthd_index, type, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, type, (unsigned int)c);
 #endif
 
 	//if already in, then don't add
@@ -528,7 +526,7 @@ void __lwt_chan_triger_evnt(lwt_chan_t c, lwt_chan_dir_t type)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x is already in send list, return.\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 		return;
 	}
@@ -538,7 +536,7 @@ void __lwt_chan_triger_evnt(lwt_chan_t c, lwt_chan_dir_t type)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x is not in any cgrp, return.\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 
 		return;
@@ -589,7 +587,7 @@ lwt_chan_t __lwt_chan_consume_evnt(lwt_cgrp_t cg, lwt_chan_dir_t type)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: remove event from cg 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg);
 #endif
 
 	//TODO: concurrency problem need to solve.
@@ -676,7 +674,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: attempting to remove data from channel 0x%08x\n", 
-			curr_tcb, kthd_index, (unsigned int) c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) c);
 #endif
 
 	//_lwt_tcb* op_tcb = curr_tcb;
@@ -690,7 +688,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: no data/blocked found in channel 0x%08x, blocking...\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 
 //		__lwt_chan_triger_evnt(c, LWT_CHAN_SND);
@@ -710,7 +708,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: awake and check if any data avaliable in channel 0x%08x\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 
 	}
@@ -721,7 +719,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: data found in channel 0x%08x\n",
-				curr_tcb, kthd_index, (unsigned int) c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int) c);
 #endif
 		int cons, cons_new;
 		do{
@@ -759,7 +757,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 			printf("thread %d in kthd %d: found blocked sender %d, data put in buffer, append into rdyq.\n",
-					curr_tcb, kthd_index, ((_lwt_tcb*)(tmp->self))->lwt_id);
+					curr_tcb->lwt_id, kthd_index, ((_lwt_tcb*)(tmp->self))->lwt_id);
 #endif
 
 	//		assert(((_lwt_tcb*)(tmp->self))->wait_type == _LWT_WAIT_CHAN_SND ||
@@ -787,7 +785,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 			printf("thread %d in kthd %d: no data found, but find blocked sender %d, expecting waiting type %d or %d, however the sender is waiting for event %d, so yield to thread %d.\n",
-					curr_tcb, kthd_index, target->lwt_id, _LWT_WAIT_CHAN_SND, _LWT_WAIT_CGRP_SND, target->wait_type, lwt_rdyq_head);
+					curr_tcb->lwt_id, kthd_index, target->lwt_id, _LWT_WAIT_CHAN_SND, _LWT_WAIT_CGRP_SND, target->wait_type, lwt_rdyq_head->lwt_id);
 #endif
 			op_tcb = lwt_rdyq_head;
 			curr_tcb->lwt_status = _LWT_STAT_RDY;
@@ -801,7 +799,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: no data found, but find blocked sender %d in kthd %d, append into rdyq.\n",
-				curr_tcb, kthd_index, ((_lwt_tcb*)(tmp->self))->lwt_id, ((_lwt_tcb*)(tmp->self))->kthd_index);
+				curr_tcb->lwt_id, kthd_index, ((_lwt_tcb*)(tmp->self))->lwt_id, ((_lwt_tcb*)(tmp->self))->kthd_index);
 #endif
 		c->blocked_senders = c->blocked_senders->next;
 		//2.2
@@ -832,7 +830,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: unmark myself from waiting type %d into 0\n",
-			curr_tcb, kthd_index, curr_tcb->wait_type);
+			curr_tcb->lwt_id, kthd_index, curr_tcb->wait_type);
 #endif
 	curr_tcb->wait_type = _LWT_WAIT_NOTHING;
 
@@ -847,7 +845,7 @@ __lwt_chan_append_into_blkd_buf(lwt_chan_t c, _lwt_tcb* sender)
 		return -1;
 #ifdef DBG
 	printf("thread %d in kthd %d: thread %d in kthd %d append onto blocked list of channel 0x%08x\n",
-			curr_tcb, kthd_index, sender->lwt_id, sender->kthd_index, (unsigned int) c);
+			curr_tcb->lwt_id, kthd_index, sender->lwt_id, sender->kthd_index, (unsigned int) c);
 #endif
 	linked_buf* tmp = (linked_buf*)malloc(sizeof(linked_buf));
 	tmp->self = (void*)sender;
@@ -904,7 +902,7 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: send to channel 0x%08x failed: receiver DEAD!\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 		return -1;
 	}
@@ -913,7 +911,7 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: send to channel 0x%08x failed: receiver is nil_tcb!\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 		return -1;
 	}
@@ -927,7 +925,7 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x is not full\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 		//2.1
 		(*(void* (*)[c->buf_sz])(c->data_buf))[c->prod_p] = data_pkt;
@@ -977,8 +975,8 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 		{
 #ifdef DBG
 			printf("thread %d in kthd %d: tried to wake thread %d, expecting event %d or %d, but target is waiting for event %d, so yield to thread %d.\n",
-					curr_tcb, kthd_index, c->receiver->lwt_id, _LWT_WAIT_CHAN_RCV, _LWT_WAIT_CGRP_RCV, 
-					c->receiver->wait_type, lwt_rdyq_head);
+					curr_tcb->lwt_id, kthd_index, c->receiver->lwt_id, _LWT_WAIT_CHAN_RCV, _LWT_WAIT_CGRP_RCV, 
+					c->receiver->wait_type, lwt_rdyq_head->lwt_id);
 #endif
 			target = lwt_rdyq_head;
 
@@ -994,7 +992,7 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 		target = c->receiver;
 #ifdef DBG
 		printf("thread %d in kthd %d: now target %d in kthd %d is waiting for me, call it.\n",
-				curr_tcb, kthd_index, target, c->receiver->kthd_index);
+				curr_tcb->lwt_id, kthd_index, target->lwt_id, c->receiver->kthd_index);
 #endif
 		//2.1:
 		__lwt_chan_append_into_blkd_buf(c, curr_tcb);
@@ -1030,7 +1028,7 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: unmark myself from waiting type %d into 0\n",
-			curr_tcb, kthd_index, curr_tcb->wait_type);
+			curr_tcb->lwt_id, kthd_index, curr_tcb->wait_type);
 #endif
 	curr_tcb->wait_type = _LWT_WAIT_NOTHING;
 	return 1;
@@ -1045,7 +1043,7 @@ __lwt_chan_append_into_sndr_buf(lwt_chan_t c, lwt_t sender)
 		return -1;
 #ifdef DBG
 	printf("thread %d in kthd %d: thread %d append onto sndr list of channel 0x%08x\n",
-			curr_tcb, kthd_index, sender, (unsigned int) c);
+			curr_tcb->lwt_id, kthd_index, sender->lwt_id, (unsigned int) c);
 #endif
 
 	linked_buf* curr = c->senders;
@@ -1096,7 +1094,7 @@ void* __lwt_kthd_rbuf_monitor(void *args)
 				target = &lwt_lst_root[evnt.target_lwt];
 #ifdef DBG
 				printf("thread %d in kthd %d: control token _LWT_KTHDT_UNSET_TYPE rcved, for lwt_id %d, unset wait type\n",
-						curr_tcb, kthd_index, target);
+						curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 				assert(target != curr_tcb);
 				//		if(target->lwt_status != _LWT_STAT_RDY)
@@ -1114,7 +1112,7 @@ void* __lwt_kthd_rbuf_monitor(void *args)
 				target = &lwt_lst_root[evnt.target_lwt];
 #ifdef DBG
 				printf("thread %d in kthd %d: control token _LWT_KTHDT_SCHD rcved, for lwt_id %d, schedule into it\n",
-						curr_tcb, kthd_index, target);
+						curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 				if(target == curr_tcb)
 					continue;
@@ -1126,7 +1124,7 @@ void* __lwt_kthd_rbuf_monitor(void *args)
 			case _LWT_KTHDT_DESTORY:
 #ifdef DBG
 				printf("thread %d in kthd %d: control token _LWT_KTHDT_DESTORY rcved, thread %d exiting.\n",
-						curr_tcb, kthd_index, target);
+						curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 				return NULL;
 				break;
@@ -1162,7 +1160,7 @@ void* __lwt_kthd_wrapper(void *args)
 	kthds[kthd_index].kthd_rbuf_len_p = &kthd_rbuf_len;
 
 #ifdef DBG
-	printf("thread %d in kthd %d: in kthd_wrapper\n",curr_tcb, kthd_index);
+	printf("thread %d in kthd %d: in kthd_wrapper\n",curr_tcb->lwt_id, kthd_index);
 #endif
 
 	//same as lwt_create
@@ -1200,7 +1198,7 @@ void* __lwt_kthd_wrapper(void *args)
 	kthds[kthd_index].done_init = 1;
 #ifdef DBG
 	printf("thread %d in kthd %d: lwt init done, start scheduling\n", 
-			curr_tcb, kthd_index);
+			curr_tcb->lwt_id, kthd_index);
 #endif
 
 
@@ -1213,7 +1211,7 @@ void* __lwt_kthd_wrapper(void *args)
 
 
 #ifdef DBG
-	printf("thread %d in kthd %d: child kthd done\n",curr_tcb, kthd_index);
+	printf("thread %d in kthd %d: child kthd done\n",curr_tcb->lwt_id, kthd_index);
 #endif
 
 	return NULL;

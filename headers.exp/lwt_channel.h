@@ -73,7 +73,7 @@ lwt_chan(int sz)
 	c->receiver = curr_tcb;
 
 #ifdef DBG
-	printf("thread %d in kthd %d: channel 0x%08x constructed.\n", curr_tcb, kthd_index, (unsigned int)c);
+	printf("thread %d in kthd %d: channel 0x%08x constructed.\n", curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 
 	return c;
@@ -93,7 +93,7 @@ lwt_chan(int sz)
 lwt_chan_deref(lwt_chan_t c)
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: derefing channel 0x%08x.\n", curr_tcb, kthd_index, (unsigned int)c);
+	printf("thread %d in kthd %d: derefing channel 0x%08x.\n", curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 	if(unlikely(c==NULL))
 		return;
@@ -102,13 +102,13 @@ lwt_chan_deref(lwt_chan_t c)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x receiver derefed.\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 		c->receiver = nil_tcb;
 	}else
 	{
 #ifdef DBG
-		printf("thread %d in kthd %d: channel sender derefed.\n", curr_tcb, (unsigned int)kthd_self);
+		printf("thread %d in kthd %d: channel sender derefed.\n", curr_tcb->lwt_id, (unsigned int)kthd_self);
 #endif
 		//fo through the dlinked buffer
 		linked_buf* curr = c->senders;
@@ -130,7 +130,7 @@ lwt_chan_deref(lwt_chan_t c)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x deref accepted.\n",
-				curr_tcb, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 	//	assert(c->buf_len == 0);		//no data_buf
 		if(c->buf_len != 0)
@@ -171,7 +171,7 @@ lwt_snd(lwt_chan_t c, void* data)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: sending data %d to thread %d by channel 0x%08x\n", 
-			curr_tcb, kthd_index, (int)data, c->receiver, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (int)data, c->receiver->lwt_id, (unsigned int)c);
 #endif
 
 	while(unlikely(curr_tcb->chan_data_useful))
@@ -192,7 +192,7 @@ lwt_snd(lwt_chan_t c, void* data)
 	curr_tcb->chan_data_useful = 1;
 #ifdef DBG
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_SND\n",
-			curr_tcb, kthd_index, _LWT_WAIT_CHAN_SND);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_SND);
 #endif
 	curr_tcb->wait_type = _LWT_WAIT_CHAN_SND;
 
@@ -222,9 +222,9 @@ lwt_rcv(lwt_chan_t c)
 	}
 #ifdef DBG
 	printf("thread %d in kthd %d: attempting to rcv on channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_RCV\n",
-			curr_tcb, kthd_index, _LWT_WAIT_CHAN_RCV);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_RCV);
 #endif
 
 	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
@@ -233,7 +233,7 @@ lwt_rcv(lwt_chan_t c)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: rcved data %d from channel 0x%08x.\n",
-			curr_tcb, kthd_index, (int)data, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (int)data, (unsigned int)c);
 #endif
 
 	return data;
@@ -249,9 +249,9 @@ lwt_snd_chan(lwt_chan_t sender, lwt_chan_t sendee)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: sending channel 0x%08x to thread %d by channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)sendee, sender->receiver, (unsigned int)sender);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)sendee, sender->receiver->lwt_id, (unsigned int)sender);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_SND\n",
-			curr_tcb, kthd_index, _LWT_WAIT_CHAN_SND);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_SND);
 #endif
 
 	while(unlikely(curr_tcb->chan_data_useful))
@@ -292,9 +292,9 @@ lwt_rcv_chan(lwt_chan_t c)
 	}
 #ifdef DBG
 	printf("thread %d in kthd %d: rcving channel from channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_RCV\n",
-			curr_tcb, kthd_index, _LWT_WAIT_CHAN_RCV);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_RCV);
 #endif
 
 	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
@@ -302,7 +302,7 @@ lwt_rcv_chan(lwt_chan_t c)
 	lwt_chan_t  data_pkt = (lwt_chan_t)__lwt_chan_remove_from_data_buf(c);
 #ifdef DBG
 	printf("thread %d in kthd %d: channel 0x%08x was received through channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int) data_pkt, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) data_pkt, (unsigned int)c);
 #endif
 	return data_pkt;
 }
@@ -344,7 +344,7 @@ lwt_cgrp_free(lwt_cgrp_t cg)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: attempting to free cgrp 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg);
 #endif
 
 	//TODO: This is actually checking the channel length, not the event length. Fix it!
@@ -371,7 +371,7 @@ lwt_cgrp_free(lwt_cgrp_t cg)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: will free cg 0x%08x now\n",
-			curr_tcb, kthd_index, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg);
 #endif
 
 	free(cg);
@@ -386,7 +386,7 @@ lwt_cgrp_add(lwt_cgrp_t cg, lwt_chan_t c, lwt_chan_dir_t type)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: channel 0x%08x added to cgrp 0x%08x on direction %d\n",
-			curr_tcb, kthd_index, (unsigned int)c, (unsigned int)cg, type);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c, (unsigned int)cg, type);
 #endif
 	switch(type){
 		case LWT_CHAN_SND:
@@ -419,7 +419,7 @@ lwt_cgrp_rem(lwt_cgrp_t cg, lwt_chan_t c)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: trying to remove channel 0x%08x from cgrp 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)c, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c, (unsigned int)cg);
 #endif
 	if(c->cgrp_snd == cg)
 		c->cgrp_snd = NULL;
@@ -450,7 +450,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: waiting for cgrp 0x%08x on direction %d\n",
-			curr_tcb, kthd_index, (unsigned int)cg, direction);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg, direction);
 #endif
 
 	int* evnt_cnt = NULL;
@@ -459,7 +459,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CGRP_SND\n",
-				curr_tcb, kthd_index, _LWT_WAIT_CGRP_SND);
+				curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_SND);
 #endif
 		cg->snd_waiter = curr_tcb;
 		evnt_cnt = &(cg->snd_evnt_cnt);
@@ -467,7 +467,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 	}else if (direction == LWT_CHAN_RCV){
 #ifdef DBG
 		printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CGRP_RCV\n",
-				curr_tcb, kthd_index, _LWT_WAIT_CGRP_RCV);
+				curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_RCV);
 #endif
 		cg->rcv_waiter = curr_tcb;
 		evnt_cnt = &(cg->rcv_evnt_cnt);
@@ -477,7 +477,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 		if(cg->rcv_evnt_cnt > 0){
 #ifdef DBG
 			printf("thread %d in kthd %d: wait on no direction, mark self as wait type %d: _LWT_WAIT_CGRP_RCV\n",
-					curr_tcb, kthd_index, _LWT_WAIT_CGRP_RCV);
+					curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_RCV);
 #endif
 			cg->rcv_waiter = curr_tcb;
 			evnt_cnt = &(cg->rcv_evnt_cnt);
@@ -486,7 +486,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 		{
 #ifdef DBG
 			printf("thread %d in kthd %d: wait on no direction, mark self as wait type %d: _LWT_WAIT_CGRP_SND by default\n",
-					curr_tcb, kthd_index, _LWT_WAIT_CGRP_SND);
+					curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_SND);
 #endif
 			cg->snd_waiter = curr_tcb;
 			evnt_cnt = &(cg->snd_evnt_cnt);
@@ -510,7 +510,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 	
 #ifdef DBG
 	printf("thread %d in kthd %d: wait for cgrp 0x%08x returns with evnt_cnt %d\n",
-			curr_tcb, kthd_index, (unsigned int)cg, *evnt_cnt);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg, *evnt_cnt);
 #endif
 
 	return __lwt_chan_consume_evnt(cg, direction);
@@ -522,7 +522,7 @@ lwt_chan_mark_set(lwt_chan_t c, void* mark)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: set mark %d to channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int) mark, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) mark, (unsigned int)c);
 #endif
 	c->mark = mark;
 	
@@ -535,7 +535,7 @@ lwt_chan_mark_get(lwt_chan_t c)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: get mark %d from channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int) c->mark, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) c->mark, (unsigned int)c);
 #endif
 	return c->mark;
 }
@@ -557,9 +557,9 @@ lwt_snd_cdeleg(lwt_chan_t c, lwt_chan_t delegating)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: delegating channel 0x%08x to thread %d by channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)delegating, c->receiver, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)delegating, c->receiver->lwt_id, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_SND\n",
-			curr_tcb, kthd_index, _LWT_WAIT_CHAN_SND);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_SND);
 #endif
 
 	while(unlikely(curr_tcb->chan_data_useful))
@@ -595,9 +595,9 @@ lwt_rcv_cdeleg(lwt_chan_t c)
 		return NULL;
 #ifdef DBG
 	printf("thread %d in kthd %d: rcving delegating channel from channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_RCV\n",
-			curr_tcb, kthd_index, _LWT_WAIT_CHAN_RCV);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_RCV);
 #endif
 
 	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
@@ -607,7 +607,7 @@ lwt_rcv_cdeleg(lwt_chan_t c)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: channel 0x%08x was received and delegated through channel 0x%08x\n",
-			curr_tcb, kthd_index, (unsigned int) data, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) data, (unsigned int)c);
 #endif
 	return data;
 
