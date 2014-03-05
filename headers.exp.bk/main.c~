@@ -22,208 +22,186 @@
 
 #define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
 
-#define ITER 3
+
+#define IS_RESET()						\
+        assert( lwt_info(LWT_INFO_NTHD_RUNNABLE) == 1 &&	\
+		lwt_info(LWT_INFO_NTHD_ZOMBIES) == 0 &&		\
+		lwt_info(LWT_INFO_NTHD_BLOCKED) == 0\
+		)
 
 
-void* grp_wait_snder(void* param, lwt_chan_t c)
-{
-	lwt_chan_t cc2 = lwt_chan(10);
-	lwt_snd_chan((lwt_chan_t)param, cc2);
-	lwt_chan_t cg_a[ITER];
+#define ITER 100000
 
-	int i=0;
-	for(i=0; i<ITER; i++)
-	{
-		printf("in_main: thread %d: waiting incoming channel %d\n", current_tid, i);
-		cg_a[i] = lwt_rcv_chan(cc2);
-		printf("in_main: thread %d: channel %d rcved.\n", current_tid, i);
-	}
-
-	
-	i--;
-	for(;i>=0; i--)
-	{
-		printf("in_main: thread %d: sending %d\n", current_tid, i);
-		lwt_snd(cg_a[i], (void*)i);
-		printf("in_main: thread %d: %d sent\n", current_tid, i);
-	}
-
-	return NULL;
-
-}
-
-void* grp_wait_rcver(void* param, lwt_chan_t c)
-{
-	lwt_chan_t cc = lwt_chan(10);
-	lwt_snd_chan((lwt_chan_t)param, cc);
-	lwt_chan_t cc2 = lwt_rcv_chan(cc);
-	lwt_cgrp_t cg = lwt_cgrp();
-	int i=0;
-	for(i=0; i < ITER; i++)
-	{
-		lwt_chan_t cci = lwt_chan(3);
-		assert(lwt_cgrp_add(cg, cci, LWT_CHAN_RCV) == 0);
-		printf("in_main: thread %d: sending channel %d\n", current_tid, i);
-		lwt_snd_chan(cc2, cci);
-		printf("in_main: thread %d: channel %d sent\n", current_tid, i);
-	}
-
-	while(i>0)
-	{
-		printf("in_main: thread %d: group waiting\n", current_tid);
-		lwt_chan_t cci = lwt_cgrp_wait(cg, LWT_CHAN_RCV);
-		printf("in_main: thread %d: cci rcved, start rcv data\n", current_tid);
-		i = (int)lwt_rcv(cci);
-		printf("in_main: thread %d: i rcved: %d\n", current_tid, i);
-	}
-
-	return NULL;
-
-}
-
-
-
-int test_grp_wait_with_buffer()
-{
-
-	lwt_chan_t main_c = lwt_chan(1);
-	lwt_t id1 = lwt_create(grp_wait_snder, (void*)main_c, 0, 0);
-	lwt_chan_t snd_c = lwt_rcv_chan(main_c);
-	lwt_t id2 = lwt_create(grp_wait_rcver, (void*)main_c, 0, 0);
-	lwt_chan_t rcv_c = lwt_rcv_chan(main_c);
-	lwt_snd_chan(rcv_c, snd_c);
-
-	lwt_join(id1);
-	lwt_join(id2);
-
-	return 0;
-}
-
-void* kthd_rcv_print(void* data, lwt_chan_t rcv_c)
-{
-	printf("in kthd: data: %d and channel 0x%08x rcvd!\n",
-			(int)data, (unsigned int)rcv_c);
-
-
-	lwt_chan_t cc = lwt_chan(0);
-	lwt_chan_t main_c = lwt_rcv_chan(rcv_c);
-	lwt_snd_chan(main_c, cc);
-
-
-	/*
-	   void* pkg = lwt_rcv(cc);
-	   printf("in kthd: data %d rcvd!\n", (int)pkg);
-	   pkg = lwt_rcv(cc);
-	   printf("in kthd: data %d rcvd!\n", (int)pkg);
-	   pkg = lwt_rcv(cc);
-	   printf("in kthd: data %d rcvd!\n", (int)pkg);
-	   pkg = lwt_rcv(cc);
-	   printf("in kthd: data %d rcvd!\n", (int)pkg);
-	   pkg = lwt_rcv(cc);
-	   printf("in kthd: data %d rcvd!\n", (int)pkg);
-	   */
-
-	lwt_cgrp_t cg = lwt_cgrp();
-	lwt_cgrp_add(cg, cc, LWT_CHAN_RCV);
-	lwt_chan_t actived;
-	printf("====start wait====\n");
-	while((actived = lwt_cgrp_wait(cg, LWT_CHAN_RCV)) != NULL)
-	{
-		assert(actived == cc);
-		void* pkg = lwt_rcv(actived);
-		printf("in kthd: data %d rcvd!\n", (int)pkg);
-	}
-	printf("====end wait====\n");
-	return NULL;
-}
-
-void* kthd_snd_print(void* data, lwt_chan_t snd_c)
-{
-
-	lwt_chan_t cc = lwt_rcv_chan(snd_c);
-	printf("channel 0x%08x rcvd!\n", (unsigned int)cc);
-
-	printf("====start send====\n");
-	lwt_snd(cc, (void*)0x10);
-	lwt_snd(cc, (void*)0x20);
-	lwt_snd(cc, (void*)0x30);
-	lwt_snd(cc, (void*)0x40);
-	lwt_snd(cc, (void*)0x50);
-	printf("====end send====\n");
-	return NULL;
-
-}
 
 void* fn(void* data, lwt_chan_t c)
 {
 	return NULL;
 }
 
-int test_kthd()
+int test_speed_create_join()
 {
-	lwt_chan_t rcv_c = lwt_chan(0);
-	lwt_chan_t snd_c = lwt_chan(0);
-	lwt_kthd_create(&kthd_rcv_print, (void*)0x1, rcv_c);
-	lwt_kthd_create(&kthd_snd_print, (void*)0x1, snd_c);
-	lwt_chan_t main_c = lwt_chan(0);
-	lwt_snd_chan(rcv_c, main_c);
-	lwt_chan_t cc = lwt_rcv_chan(main_c);
-	lwt_snd_chan(snd_c, cc);
-
-//	sleep(1);
-	//kthd_snd_print(rcv_c);
-	return 0;
-}
-
-int test_nojoin()
-{
-
-	lwt_create(fn, NULL, LWT_FLAG_NOJOIN, NULL);
-	assert(num_of_threads == 2);
-	lwt_yield(_LWT_NULL);
-	assert(num_of_threads == 1);
-	return 0;
-}
-
-int test_kthd_iter()
-{
-	lwt_chan_t c = lwt_chan(3);
-
-	unsigned long long start, end;
-	rdtscll(start);
-	
 	int i=0;
-	for(i=0; i< ITER; i++)
-		lwt_kthd_create(&fn, (void*)0x1, c);
+	unsigned long long start, end;
+	lwt_t tid1, tid2, tid3;
 
+	tid1 = lwt_create(fn, NULL, 0, 0);
+	lwt_join(tid1);
+	IS_RESET();
+
+	rdtscll(start);
+	for(i=0 ; i < ITER; i++)
+	{
+		tid1 = lwt_create(fn, NULL, 0, 0);
+		lwt_join(tid1);
+	}
+	rdtscll(end);
+	IS_RESET();
+	printf("performance of fork/join: --> %lld\n", (end-start)/ITER);
+
+	for(i=0 ; i < ITER; i++)
+	{
+		tid1 = lwt_create(fn, NULL, 0, 0);
+		tid2 = lwt_create(fn, NULL, 0, 0);
+		tid3 = lwt_create(fn, NULL, 0, 0);
+		lwt_join(tid3);
+		lwt_join(tid1);
+		lwt_join(tid2);
+	}
+
+	IS_RESET();
+
+
+	return 0;
+}
+
+void* fn_bounce(void* data, lwt_chan_t c)
+{
+	lwt_yield(LWT_NULL);
+	int i=0;
+
+	unsigned long long int start, end;
+
+	rdtscll(start);
+	for(i=0 ; i < ITER; i++)
+	{
+		lwt_yield(LWT_NULL);
+	}
 	rdtscll(end);
 
-	printf("%lld <- kthd_create\n", (end-start)/(ITER));
-	return 0;
+	if(data)
+		printf("performance of yield: --> %lld\n", (end-start)/(ITER*2));
+
+
+	lwt_yield(LWT_NULL);
+	return NULL;
 }
 
-int test_basic()
+
+void test_speed_yield()
 {
-	int i=0;
-	for(i=0; i < 10; i++)
-	{
-	lwt_t tid = lwt_create(fn, NULL, 0, 0);
-	lwt_join(tid);
-	}
-	return 0;
+	lwt_t tid1, tid2;
+	tid1 = lwt_create(fn_bounce, (void*)1, 0, 0);
+	tid2 = lwt_create(fn_bounce, NULL, 0, 0);
+	lwt_yield(LWT_NULL);
+	lwt_join(tid1);
+	lwt_join(tid2);
+	lwt_yield(LWT_NULL);
+
+	IS_RESET();
 }
+
+
+void* fn_nested_create(void* data, lwt_chan_t c)
+{
+	int param = (int)data;
+	lwt_t id;
+	if(param< 5)
+	{
+		printf("create: %d\n", param);
+		id = lwt_create(fn_nested_create, (void*)(param+1), 0, 0);
+		lwt_yield(id);
+		printf("join: %d\n", param);
+		lwt_join(id);
+	}
+	lwt_yield(LWT_NULL);
+
+	return NULL;
+}
+
+void test_function_basic()
+{
+	lwt_t id;
+	IS_RESET();
+	id = lwt_create(fn_nested_create, 0, 0, 0);
+	lwt_yield(LWT_NULL);
+	
+
+	printf("join in parent\n");
+	lwt_join(id);
+	lwt_yield(LWT_NULL);
+
+	IS_RESET();
+}
+
+
+void *
+fn_chan(void *data, lwt_chan_t c)
+{
+	lwt_chan_t from;
+	lwt_chan_t to = data;
+	int i;
+	
+	from = lwt_chan(0);
+	lwt_snd_chan(to, from);
+	assert(from->snd_cnt);
+	for (i = 0 ; i < ITER ; i++) {
+		lwt_snd(to, (void*)1);
+		assert(2 == (int)lwt_rcv(from));
+	}
+	lwt_chan_deref(from);
+	
+	return NULL;
+}
+
+void
+test_perf_channels(int chsz)
+{
+	lwt_chan_t from, to;
+	lwt_t t;
+	int i;
+	unsigned long long start, end;
+
+	assert(_LWT_STAT_RUN == lwt_current()->lwt_status);
+	from = lwt_chan(chsz);
+	assert(from);
+	//lwt_chan_grant(from);
+	t    = lwt_create(fn_chan, from, 0, 0);
+	to   = lwt_rcv_chan(from);
+	assert(to->snd_cnt);
+	rdtscll(start);
+	for (i = 0 ; i < ITER ; i++) {
+		assert(1 == (int)lwt_rcv(from));
+		lwt_snd(to, (void*)2);
+	}
+	lwt_chan_deref(to);
+	rdtscll(end);
+	printf("[PERF] %lld <- snd+rcv (buffer size %d)\n", 
+	       (end-start)/(ITER*2), chsz);
+	lwt_join(t);
+}
+
 
 int main(int argc, char** argv)
 {
-
-//	printf("testing grp_wait...\n");
-//	test_grp_wait_with_buffer();
-
-//	test_nojoin();
-//	test_kthd();
-	//test_kthd_iter();
-	test_basic();
-	//lwt_yield(_LWT_NULL);
+//	IS_RESET();
+//	test_function_basic();
+//	IS_RESET();
+//	test_speed_create_join();
+//	IS_RESET();
+//	test_speed_yield();
+	IS_RESET();
+	test_perf_channels(9);
+	IS_RESET();
 
 	printf("back to main\n");
 	return EXIT_SUCCESS;

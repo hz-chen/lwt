@@ -28,13 +28,14 @@ static inline int
 __cas(int *target, int cmp, int updated)
 {
 	char z;
-	__asm__ __volatile__("lock cmpxchgl %2, %0; setz %1"
+	__asm__ __volatile__("lock; cmpxchgl %2, %0; setz %1"
 			     : "+m" (*target),
 			       "=a" (z)
 			     : "q"  (updated),
 			       "a"  (cmp)
 			     : "memory", "cc");
-	return (int)!z;
+	//return (int)!z;
+	return (int)z;
 }
 
 inline int __faa( int * variable, int value ) {

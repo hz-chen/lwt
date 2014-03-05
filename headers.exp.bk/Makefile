@@ -6,13 +6,13 @@ DBG_FLAGS=-g -DDBG
 O_FLAGS=-O3
 LIBS=-lpthread
 main: $(HEADER_FILES)  $(ASM_FILES) main.c 
-	gcc $^ $(COMM_FLAGS) -g -o $@ $(LIBS)
+	gcc $^ $(COMM_FLAGS) $(PROF_FLAGS) -o $@ $(LIBS)
 
 exam: $(HEADER_FILES) $(ASM_FILES) exam.c
 	gcc $^ $(COMM_FLAGS) $(DBG_FLAGS) -o $@ $(LIBS)
 
 final: $(HEADER_FILES) $(ASM_FILES) exam.c
-	gcc $^ $(COMM_FLAGS) $(O_FLAGS) -o $@ $(LIBS)
+	gcc $^ $(COMM_FLAGS) -O3 -o $@ $(LIBS)
 
 lib:  $(HEADER_FILES) $(ASM_FILES)
 	gcc  $(COMM_FLAGS) -fPIC -c $^ $(LIBS)

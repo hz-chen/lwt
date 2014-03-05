@@ -64,8 +64,8 @@ lwt_chan(int sz)
 	c->buf_sz = sz;
 	c->prod_p = 0;
 	c->cons_p = 0;
-	c->blocked_senders = nil;
-	c->blocked_senders_last = nil;
+	c->blocked_senders = nil_tcb;
+	c->blocked_senders_last = nil_tcb;
 	c->blocked_len = 0;
 	c->snd_cnt = 0;
 	c->cgrp_snd = NULL;
@@ -115,7 +115,7 @@ lwt_chan_deref(lwt_chan_t c)
 		linked_buf* prev = c->senders;
 		while(NULL != curr)
 		{
-			if(((_lwt_tcb*)(curr->self))== curr_tcb)
+			if(((lwt_t)(curr->self))== curr_tcb)
 			{
 				prev->next = curr->next;
 				c->snd_cnt--;
@@ -177,8 +177,7 @@ lwt_snd(lwt_chan_t c, void* data)
 	while(unlikely(curr_tcb->chan_data_useful))
 	{
 		//while my data is still avaliable, schedule else where
-		//_lwt_tcb* op_tcb = lwt_rdyq_head;
-		_lwt_tcb* op_tcb = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 
 		curr_tcb->lwt_status = _LWT_STAT_RDY;
 		__lwt_append_into_rdyq(curr_tcb);
@@ -230,6 +229,7 @@ lwt_rcv(lwt_chan_t c)
 	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
 	void* data = __lwt_chan_remove_from_data_buf(c);
 
+	curr_tcb->wait_type = _LWT_WAIT_NOTHING;
 
 #ifdef DBG
 	printf("thread %d in kthd %d: rcved data %d from channel 0x%08x.\n",
@@ -257,8 +257,8 @@ lwt_snd_chan(lwt_chan_t sender, lwt_chan_t sendee)
 	while(unlikely(curr_tcb->chan_data_useful))
 	{
 		//while my data is still avaliable, schedule else where
-		//_lwt_tcb* op_tcb = lwt_rdyq_head;
-		_lwt_tcb* op_tcb = lwt_rdyq_head;
+		//lwt_t op_tcb = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 
 		curr_tcb->lwt_status = _LWT_STAT_RDY;
 		__lwt_append_into_rdyq(curr_tcb);
@@ -498,7 +498,7 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 
 	while(*evnt_cnt == 0)
 	{
-		_lwt_tcb* op_tcb = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 		__lwt_remove_from_rdyq(op_tcb);
 		curr_tcb->lwt_status = _LWT_STAT_RDY;
 		__lwt_append_into_rdyq(curr_tcb);
@@ -565,7 +565,7 @@ lwt_snd_cdeleg(lwt_chan_t c, lwt_chan_t delegating)
 	while(unlikely(curr_tcb->chan_data_useful))
 	{
 		//while my data is still avaliable, schedule else where
-		_lwt_tcb* op_tcb = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 
 		curr_tcb->lwt_status = _LWT_STAT_RDY;
 		__lwt_append_into_rdyq(curr_tcb);

@@ -1,20 +1,19 @@
-
-This is the optimization working folder.
-
-
 /*******************************************
 *
 * Author: HzChen - hzchen_cs@gwmail.gwu.edu
 *
 *
-* Last modified:	03-05-2014 04:31
+* Last modified:	03-05-2014 05:57
 *
 * Filename:		README
 *
 * Description: 	general API
+*			This is the optimization working folder.
 *
 *
 ******************************************/
+
+
 
 General background: 
 	This is a multi-thread library. I haven't tested all the functions into every detail yet, but at least it's a working library and most functionalities are working :)
@@ -41,7 +40,7 @@ lwt_join:	join target thread.
 		lwt_t target: lwt_t of target thread.
 
 lwt_die:	suicide.
-	A thread will automaticall call this function after the returning of routing function. If user manually calls this function in a thread, it will kill it self.
+	A thread will automaticall call this function after the returning of routing function. If user manually calls this function in a thread, it will kill it self. After calling of this function, a thread will be in ZOMBIE status.
 	Parameters:
 		void* retVal: a pointer points to a location to hold the return value.
 

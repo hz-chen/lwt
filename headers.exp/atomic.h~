@@ -25,10 +25,10 @@
  * Now, we know that var is set to new_var.
  */
 static inline int 
-__cas(unsigned long *target, unsigned long cmp, unsigned long updated)
+__cas(int *target, int cmp, int updated)
 {
 	char z;
-	__asm__ __volatile__("lock cmpxchgl %2, %0; setz %1"
+	__asm__ __volatile__("lock; cmpxchgl %2, %0; setz %1"
 			     : "+m" (*target),
 			       "=a" (z)
 			     : "q"  (updated),
@@ -37,7 +37,7 @@ __cas(unsigned long *target, unsigned long cmp, unsigned long updated)
 	return (int)!z;
 }
 
-inline int __faa( unsigned long int * variable, int value ) {
+inline int __faa( int * variable, int value ) {
 	asm volatile("lock; xaddl %%eax, %2;"
 			:"=a" (value)                  //Output
 			:"a" (value), "m" (*variable)  //Input

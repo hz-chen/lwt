@@ -23,9 +23,6 @@
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 
-//lwt rdy queue size
-#define _LWT_RQUEUE_MAX	2048
-
 //thread status
 typedef enum{
 	_LWT_STAT_UNINIT,		//0
@@ -84,9 +81,13 @@ typedef struct node_t{
 
 __thread linked_buf* nil;
 
-typedef int lwt_t;
+typedef struct _lwt_tcb_t* lwt_t;
 typedef int kthd_t;
 typedef struct _lwt_tcb_t _lwt_tcb;
+
+__thread _lwt_tcb* nil_tcb;
+
+#define LWT_NULL	nil_tcb
 
 struct lwt_channel{
 	/*Sender data*/
@@ -97,9 +98,9 @@ struct lwt_channel{
 	int prod_p, cons_p;		//producer pointer & consumer pointer.
 
 	/****/
-	linked_buf* blocked_senders;	//when buf_len == buf_sz, the newly incoming 
+	lwt_t blocked_senders;	//when buf_len == buf_sz, the newly incoming 
 									//senders will be put here
-	linked_buf* blocked_senders_last;	//pointer points to the last one in the blocked_senders.
+	lwt_t blocked_senders_last;	//pointer points to the last one in the blocked_senders.
 	int blocked_len;			//how many senders are blocked?
 	linked_buf* senders;		//senders to this channel.
 	int snd_cnt;				//# of senders in this channel?
@@ -128,13 +129,11 @@ typedef void* lwt_reg_t;
 #define _LWT_KTHD_EVNT_BUF	2048
 #define _LWT_KTHD_MAX_NUM	2048
 
-#define _LWT_NULL	-1
-
 #define LWT_FLAG_NOJOIN	1
 
 
 //total number of lwt
-#define _LWT_SIZE 2048
+#define _LWT_SIZE 8192
 
 
 /*
@@ -159,20 +158,20 @@ typedef struct _lwt_chan_data_t{
  * The waitq_next marks the next lwt_tcb in the wait queue.
  */
 struct _lwt_tcb_t{
-	lwt_t lwt_id;		//offset	
-	lwt_t rdyq_prev;		//offset+4		0x4
-	lwt_t rdyq_next;		//offset+8		0x8
+	int lwt_id;		//offset	
+	_lwt_tcb* rdyq_prev;		//offset+4		0x4
+	_lwt_tcb* rdyq_next;		//offset+8		0x8
 	lwt_reg_t lwt_ebp;	//offset+12		0xc
 	lwt_reg_t lwt_esp;	//offset+16		0x10
 	lwt_reg_t lwt_ip;	//offset+20		0x14
 	_lwt_stat_t lwt_status;		//offset+24	0x18
 	//we have a dead queue as linked list
-	lwt_t deadq_next;		//offset+28		0x1c
-	lwt_t deadq_prev;		//offset+32		0x20
+	_lwt_tcb* deadq_prev;		//offset+28		0x20
+	_lwt_tcb* deadq_next;		//offset+32		0x1c
+	_lwt_tcb* parent;			//offset+36		0x24
 	//parent thread
-	lwt_t parent;			//offset+36	0x24
 	//am I been joined?
-	lwt_t joined;			//offset+40	0x28
+	_lwt_tcb* joined;			//offset+40	0x28
 
 	void* ret_val;		//offset 44		0x2c
 	lwt_reg_t ebp_base;	//offset 48		0x30
@@ -181,11 +180,12 @@ struct _lwt_tcb_t{
 //	lwt_t cgrp_wait_next;
 	int flag;			//offset + 52
 	_lwt_wait_type_t wait_type;	//offset + 56
-	int chan_data_useful;
-	void* chan_data;	//offset+60		0x3c
-	pthread_t kthd_t;	//offset + 64
-	kthd_t kthd_index;	//offset + 64
-	int padding[13];
+	int chan_data_useful;	//offset + 60
+	void* chan_data;	//offset+64		0x3c
+	pthread_t kthd_t;	//offset + 68
+	kthd_t kthd_index;	//offset + 72
+	lwt_t blkq_next;	//offset + 76
+	int padding[12];
 };		//total size: 128
 
 
@@ -215,7 +215,7 @@ typedef struct lwt_cgrp * lwt_cgrp_t;
 
 struct lwt_kthd_evnt{
 	_lwt_kthd_ctrl_t token;
-	lwt_t target_lwt;
+	int target_lwt;
 };
 
 

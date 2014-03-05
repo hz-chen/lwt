@@ -30,9 +30,8 @@
 		)
 
 
-#define ITER 1000000
+#define ITER 100000
 
-lwt_t arr[1024];
 
 void* fn(void* data, lwt_chan_t c)
 {
@@ -115,32 +114,27 @@ void test_speed_yield()
 void* fn_nested_create(void* data, lwt_chan_t c)
 {
 	int param = (int)data;
+	lwt_t id;
 	if(param< 5)
 	{
 		printf("create: %d\n", param);
-		arr[param] = lwt_create(fn_nested_create, (void*)(param+1), 0, 0);
-		lwt_yield(arr[param]);
+		id = lwt_create(fn_nested_create, (void*)(param+1), 0, 0);
+		lwt_yield(id);
+		printf("join: %d\n", param);
+		lwt_join(id);
 	}
 	lwt_yield(LWT_NULL);
 
 	return NULL;
 }
 
-void test_function_create_join()
+void test_function_basic()
 {
 	lwt_t id;
 	IS_RESET();
 	id = lwt_create(fn_nested_create, 0, 0, 0);
 	lwt_yield(LWT_NULL);
 	
-	int cnt = 0;
-	while(cnt < 5)
-	{
-		printf("join: %d\n", cnt);
-		lwt_yield(LWT_NULL);
-		lwt_join(arr[cnt]);
-		cnt++;
-	}
 
 	printf("join in parent\n");
 	lwt_join(id);
@@ -149,13 +143,64 @@ void test_function_create_join()
 	IS_RESET();
 }
 
+
+void *
+fn_chan(void *data, lwt_chan_t c)
+{
+	lwt_chan_t from;
+	lwt_chan_t to = data;
+	int i;
+	
+	from = lwt_chan(0);
+	lwt_snd_chan(to, from);
+	assert(from->snd_cnt);
+	for (i = 0 ; i < ITER ; i++) {
+		lwt_snd(to, (void*)1);
+		assert(2 == (int)lwt_rcv(from));
+	}
+	lwt_chan_deref(from);
+	
+	return NULL;
+}
+
+void
+test_perf_channels(int chsz)
+{
+	lwt_chan_t from, to;
+	lwt_t t;
+	int i;
+	unsigned long long start, end;
+
+	assert(_LWT_STAT_RUN == lwt_current()->lwt_status);
+	from = lwt_chan(chsz);
+	assert(from);
+	//lwt_chan_grant(from);
+	t    = lwt_create(fn_chan, from, 0, 0);
+	to   = lwt_rcv_chan(from);
+	assert(to->snd_cnt);
+	rdtscll(start);
+	for (i = 0 ; i < ITER ; i++) {
+		assert(1 == (int)lwt_rcv(from));
+		lwt_snd(to, (void*)2);
+	}
+	lwt_chan_deref(to);
+	rdtscll(end);
+	printf("[PERF] %lld <- snd+rcv (buffer size %d)\n", 
+	       (end-start)/(ITER*2), chsz);
+	lwt_join(t);
+}
+
+
 int main(int argc, char** argv)
 {
-	test_function_create_join();
+//	IS_RESET();
+//	test_function_basic();
+//	IS_RESET();
+//	test_speed_create_join();
+//	IS_RESET();
+//	test_speed_yield();
 	IS_RESET();
-	test_speed_create_join();
-	IS_RESET();
-	test_speed_yield();
+	test_perf_channels(9);
 	IS_RESET();
 
 	printf("back to main\n");

@@ -46,10 +46,8 @@ lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
 	//if the list is empty, then we init the root first.
 	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
 	{
-		lwt_lst_tail=0;
 		__init_pool();
 		__init_tcb(0);
-		curr_tcb = &lwt_lst_root[0];
 	}
 
 	int id = __lwt_get_target();
@@ -106,6 +104,10 @@ void* lwt_join(lwt_t target)
 	if(unlikely(curr_tcb != target_tcb->parent) ||
 		(target_tcb->flag == LWT_FLAG_NOJOIN))
 	{
+#ifdef DBG
+		printf("thread %d in kthd %d: trying to thread %d from non-parent thread, yield\n",
+				curr_tcb->lwt_id, kthd_index, target->lwt_id);
+#endif
 		lwt_yield(target);
 		return NULL;
 	}
@@ -220,6 +222,11 @@ void lwt_die(void* retVal)
 
 lwt_t lwt_current(void)
 {
+	if(unlikely(curr_tcb == NULL))
+	{
+		__init_pool();
+		__init_tcb(0);
+	}
 	return curr_tcb;
 }
 
@@ -277,7 +284,6 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 	//******************create monitor thread***********/
 	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
 	{
-		lwt_lst_tail=0;
 		lwt_rdyq_head=nil_tcb;
 		lwt_rdyq_tail=nil_tcb;
 		lwt_dead_head=nil_tcb;

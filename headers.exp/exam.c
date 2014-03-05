@@ -412,13 +412,13 @@ main(void)
 {
 	test_perf();
 	test_crt_join_sched();
-	/*
-	test_perf_channels(1);
+	test_perf_channels(0);
 	test_multisend(0);
 	test_perf_async_steam(ITER/10 < 100 ? ITER/10 : 100);
 	test_multisend(ITER/10 < 100 ? ITER/10 : 100);
 	test_grpwait(0, 3);
 	test_grpwait(3, 3);
+	/*
 	*/
 
 

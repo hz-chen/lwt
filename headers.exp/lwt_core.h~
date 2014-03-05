@@ -63,7 +63,7 @@ __thread _lwt_tcb lwt_lst_root[_LWT_SIZE];
 //This is the pointer to the tail node.
 __thread int lwt_lst_tail;
 //we have a ready queue:
-//the ready queue is a linklist, with max size _LWT_RQUEUE_MAX;
+//the ready queue is a linklist, with max size _LWT_SIZE;
 //we will not build a seperate run queue, this will simply be
 //a pointer to the first lwt_tcb in the run queue.
 //We currently useing the FIFO schedule strategy.
@@ -238,6 +238,10 @@ void __lwt_append_into_deadq(lwt_t target)
 		lwt_dead_tail = target;
 	}
 	length_of_deadq++;
+
+	//char* stack = target->lwt_ebp + _LWT_STACK_SIZE;
+	//free(stack);
+
 }
 
 /**
@@ -330,12 +334,12 @@ static inline void
 __init_pool()
 {
 	lwt_lst_root[0] = *(_lwt_tcb*)calloc(sizeof(_lwt_tcb) * _LWT_SIZE, sizeof(_lwt_tcb));
-	nil_tcb = (_lwt_tcb*)calloc(sizeof(_lwt_tcb), sizeof(_lwt_tcb));
+	nil_tcb = (_lwt_tcb*)malloc(sizeof(_lwt_tcb));
 	lwt_rdyq_head = nil_tcb;
 	lwt_rdyq_tail = nil_tcb;
 	lwt_dead_head = nil_tcb;
 	lwt_dead_head = nil_tcb;
-	curr_tcb = nil_tcb;
+	curr_tcb = &(lwt_lst_root[0]);
 }
 
 
@@ -349,7 +353,7 @@ __init_pool()
 _lwt_tcb* __init_tcb(int id)
 {
 
-	if((kthd_self == 0))
+	if(unlikely(kthd_self == 0))
 		kthd_self = pthread_self();
 
 #ifdef DBG
@@ -659,6 +663,7 @@ lwt_chan_t __lwt_chan_consume_evnt(lwt_cgrp_t cg, lwt_chan_dir_t type)
  * 				2.6: put target->chan_data into data_buf[prod_p];
  * 				2.7: buf_len ++;
  * 				2.8: mark target as RDY;
+ * 				2.8.5: unset target's wait type
  * 				2.9: put target into rdyq;
  * 		else	//no buf_len, but has blocked.
  * 			2.1: get the first thread from blocked_senders
@@ -680,7 +685,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 	//_lwt_tcb* op_tcb = curr_tcb;
 	_lwt_tcb* op_tcb = curr_tcb;
 	void* data = NULL;
-	linked_buf* tmp = NULL;
+	lwt_t tmp = nil_tcb;
 	//1
 	assert(curr_tcb == (c->receiver));
 	//2
@@ -726,6 +731,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 			cons = ((c->cons_p));
 			cons_new = (cons+1) % (c->buf_sz);
 		}while(!__cas(&(c->cons_p), cons, cons_new));
+		__faa(&(c->buf_len), -1);
 		data = (*(void* (*)[c->buf_sz])(c->data_buf))[cons];
 		
 		int blocked_len = ((c->blocked_len));
@@ -734,7 +740,7 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 		{
 			//2.4
 			tmp = c->blocked_senders;
-			c->blocked_senders = c->blocked_senders->next;
+			c->blocked_senders = c->blocked_senders->blkq_next;
 
 			//2.7
 			int prod, prod_new;
@@ -742,34 +748,36 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 				prod = c->prod_p;
 				prod_new = (prod + 1) % (c->buf_sz);
 			}while(!__cas(&(c->prod_p), prod, prod_new));
-			__faa(&(c->buf_len), -1);
-			(*(void* (*)[c->buf_sz])(c->data_buf))[prod] = ((_lwt_tcb*)(tmp->self))->chan_data;
+			__faa(&(c->buf_len), 1);
+			(*(void* (*)[c->buf_sz])(c->data_buf))[prod] = (tmp)->chan_data;
+
 
 			//0.5:
 
-			((_lwt_tcb*)(tmp->self))->chan_data_useful = 0;
+			tmp->chan_data_useful = 0;
+			tmp->wait_type = _LWT_WAIT_NOTHING;
 
 			//2.5
 			c->blocked_len--;
 			//2.6
 			if(c->blocked_len == 0)
-				c->blocked_senders_last = nil;
+				c->blocked_senders_last = nil_tcb;	
 
 #ifdef DBG
 			printf("thread %d in kthd %d: found blocked sender %d, data put in buffer, append into rdyq.\n",
-					curr_tcb->lwt_id, kthd_index, ((_lwt_tcb*)(tmp->self))->lwt_id);
+					curr_tcb->lwt_id, kthd_index, tmp->lwt_id);
 #endif
 
 	//		assert(((_lwt_tcb*)(tmp->self))->wait_type == _LWT_WAIT_CHAN_SND ||
 	//				((_lwt_tcb*)(tmp->self))->wait_type == _LWT_WAIT_CGRP_SND );
 			//2.8
-			((_lwt_tcb*)(tmp->self))->lwt_status = _LWT_STAT_RDY;
+			tmp->lwt_status = _LWT_STAT_RDY;
 			//2.9
-			if(((_lwt_tcb*)(tmp->self))->kthd_index == kthd_index)
-				__lwt_append_into_rdyq((_lwt_tcb*)(tmp->self));
+			if(tmp->kthd_index == kthd_index)
+				__lwt_append_into_rdyq(tmp);
 			else
-				__lwt_kthd_rbuf_write(((_lwt_tcb*)(tmp->self))->kthd_index, 
-						_LWT_KTHDT_SCHD, (((_lwt_tcb*)(tmp->self))->lwt_id));
+				__lwt_kthd_rbuf_write(tmp->kthd_index, 
+						_LWT_KTHDT_SCHD, (tmp->lwt_id));
 		}else
 		{
 			__lwt_chan_triger_evnt(c, LWT_CHAN_SND);
@@ -777,15 +785,14 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 	}else{
 		//2.1
 		tmp = c->blocked_senders;
-		_lwt_tcb* target = (_lwt_tcb*)(tmp->self);
-		while(unlikely(target->wait_type != _LWT_WAIT_CHAN_SND &&
-					target->wait_type != _LWT_WAIT_CGRP_SND && 
-					target->wait_type != _LWT_WAIT_NOTHING))
+		while(unlikely(tmp->wait_type != _LWT_WAIT_CHAN_SND &&
+					tmp->wait_type != _LWT_WAIT_CGRP_SND && 
+					tmp->wait_type != _LWT_WAIT_NOTHING))
 		{
 
 #ifdef DBG
 			printf("thread %d in kthd %d: no data found, but find blocked sender %d, expecting waiting type %d or %d, however the sender is waiting for event %d, so yield to thread %d.\n",
-					curr_tcb->lwt_id, kthd_index, target->lwt_id, _LWT_WAIT_CHAN_SND, _LWT_WAIT_CGRP_SND, target->wait_type, lwt_rdyq_head->lwt_id);
+					curr_tcb->lwt_id, kthd_index, tmp->lwt_id, _LWT_WAIT_CHAN_SND, _LWT_WAIT_CGRP_SND, tmp->wait_type, lwt_rdyq_head->lwt_id);
 #endif
 			op_tcb = lwt_rdyq_head;
 			curr_tcb->lwt_status = _LWT_STAT_RDY;
@@ -799,26 +806,27 @@ __lwt_chan_remove_from_data_buf(lwt_chan_t c)
 
 #ifdef DBG
 		printf("thread %d in kthd %d: no data found, but find blocked sender %d in kthd %d, append into rdyq.\n",
-				curr_tcb->lwt_id, kthd_index, ((_lwt_tcb*)(tmp->self))->lwt_id, ((_lwt_tcb*)(tmp->self))->kthd_index);
+				curr_tcb->lwt_id, kthd_index, tmp->lwt_id, tmp->kthd_index);
 #endif
-		c->blocked_senders = c->blocked_senders->next;
+		c->blocked_senders = c->blocked_senders->blkq_next;
 		//2.2
-		data = (((_lwt_tcb*)(tmp->self))->chan_data);
-		((_lwt_tcb*)(tmp->self))->chan_data_useful = 0;
+		data = (tmp->chan_data);
+		tmp->chan_data_useful = 0;
 		if(c->blocked_len == 0)
-			c->blocked_senders_last = nil;
+			c->blocked_senders_last = nil_tcb;
 		c->blocked_len--;
 
-		if(((_lwt_tcb*)(tmp->self))->kthd_index == kthd_index)
+		if(tmp->kthd_index == kthd_index)
 		{
 			//2.3.1
-			((_lwt_tcb*)(tmp->self))->lwt_status = _LWT_STAT_RDY;
+			tmp->lwt_status = _LWT_STAT_RDY;
+			tmp->wait_type = _LWT_WAIT_NOTHING;
 			//2.3.2
-			__lwt_append_into_rdyq(((_lwt_tcb*)(tmp->self)));
+			__lwt_append_into_rdyq(tmp);
 		}
 		else
-			__lwt_kthd_rbuf_write(((_lwt_tcb*)(tmp->self))->kthd_index, 
-					_LWT_KTHDT_SCHD, (((_lwt_tcb*)(tmp->self))->lwt_id));
+			__lwt_kthd_rbuf_write(tmp->kthd_index, 
+					_LWT_KTHDT_SCHD, (tmp->lwt_id));
 
 
 		//2.5
@@ -847,17 +855,14 @@ __lwt_chan_append_into_blkd_buf(lwt_chan_t c, _lwt_tcb* sender)
 	printf("thread %d in kthd %d: thread %d in kthd %d append onto blocked list of channel 0x%08x\n",
 			curr_tcb->lwt_id, kthd_index, sender->lwt_id, sender->kthd_index, (unsigned int) c);
 #endif
-	linked_buf* tmp = (linked_buf*)malloc(sizeof(linked_buf));
-	tmp->self = (void*)sender;
-	tmp->next = nil;
 	if(c->blocked_len == 0)
 	{
-		c->blocked_senders = tmp;
-		c->blocked_senders_last = tmp;
-		c->blocked_senders_last->next = nil;
+		c->blocked_senders = sender;
+		c->blocked_senders_last = sender;
+		c->blocked_senders_last->blkq_next = nil_tcb;
 	}else{
-		c->blocked_senders_last->next = tmp;
-		c->blocked_senders_last = tmp;
+		c->blocked_senders_last->blkq_next = sender;
+		c->blocked_senders_last = sender;
 	}
 	c->blocked_len++;
 
@@ -968,10 +973,13 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 
 		//lwt_t target = nil_tcb;
 		_lwt_tcb* target = nil_tcb;
-		//only if c->receiver is waiting for lwt_rcv, then calls it.
-		while(unlikely((c->receiver->wait_type != _LWT_WAIT_CHAN_RCV &&
-						c->receiver->wait_type != _LWT_WAIT_CGRP_RCV && 
-						c->receiver->wait_type != _LWT_WAIT_NOTHING )))
+		//if c->receiver is not waiting for receive event, call others 
+
+		int type = c->receiver->wait_type;
+
+		while(unlikely((type != _LWT_WAIT_CHAN_RCV &&
+						type != _LWT_WAIT_CGRP_RCV && 
+						type != _LWT_WAIT_NOTHING )))
 		{
 #ifdef DBG
 			printf("thread %d in kthd %d: tried to wake thread %d, expecting event %d or %d, but target is waiting for event %d, so yield to thread %d.\n",
@@ -988,6 +996,7 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 				target->lwt_status = _LWT_STAT_RUN;
 			__lwt_schedule(target);
 
+			type = c->receiver->wait_type;
 		}
 		target = c->receiver;
 #ifdef DBG
