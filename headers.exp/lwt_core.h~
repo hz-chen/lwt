@@ -606,6 +606,7 @@ lwt_chan_t __lwt_chan_consume_evnt(lwt_cgrp_t cg, lwt_chan_dir_t type)
 			cons_new = (cons+1)%_LWT_MAX_EVNT_SZ;
 		}while(!__cas(&(cg->rcv_cons_p), cons, cons_new));
 
+		__faa(&(cg->rcv_evnt_cnt), -1);
 		ret = (lwt_chan_t)(*evnt_arr)[cons];
 		(*evnt_arr)[cons] = 0;
 
@@ -620,6 +621,7 @@ lwt_chan_t __lwt_chan_consume_evnt(lwt_cgrp_t cg, lwt_chan_dir_t type)
 			cons_new = (cons+1)%_LWT_MAX_EVNT_SZ;
 		}while(!__cas(&(cg->snd_cons_p), cons, cons_new));
 
+		__faa(&(cg->snd_evnt_cnt), -1);
 		ret = (lwt_chan_t)(*evnt_arr)[cons];
 		(*evnt_arr)[cons] = 0;
 		ret->in_snd_evnt_lst = 0;

@@ -282,15 +282,10 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 
 
 	//******************create monitor thread***********/
-	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
+	if(curr_tcb == NULL)
 	{
-		lwt_rdyq_head=nil_tcb;
-		lwt_rdyq_tail=nil_tcb;
-		lwt_dead_head=nil_tcb;
-		lwt_dead_tail=nil_tcb;
+		__init_pool();
 		__init_tcb(0);
-		curr_tcb=0;
-		curr_tcb = &lwt_lst_root[0];
 	}
 
 	int target_id= __lwt_get_target();
@@ -311,12 +306,6 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 
 	int tmp_num;
 	int new_num;
-	/*
-	do{
-		tmp_num = kthd_num;
-		new_num = tmp_num + 1;
-	}while(!( __cas(&kthd_num, tmp_num, new_num)));
-	*/
 
 	do{
 		tmp_num = kthd_num;

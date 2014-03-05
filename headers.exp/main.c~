@@ -1,208 +1,100 @@
-/*******************************************
-*
-* Author: Hongzhou Chen - hzchen_cs@gwmail.gwu.edu
-*
-*
-* Last modified:	12-04-2013 16:04
-*
-* Filename:		main.c
-*
-* Description: 
-*
-* Input: 
-*
-* Output: 
-*
-*
-******************************************/
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "lwt.h"
 
-#define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
+#define CHAN_SZ	10
 
 
-#define IS_RESET()						\
-        assert( lwt_info(LWT_INFO_NTHD_RUNNABLE) == 1 &&	\
-		lwt_info(LWT_INFO_NTHD_ZOMBIES) == 0 &&		\
-		lwt_info(LWT_INFO_NTHD_BLOCKED) == 0\
-		)
-
-
-#define ITER 100000
-
-
-void* fn(void* data, lwt_chan_t c)
+//a seperate kthd fn generate input 
+void* fn_generate(void* data, lwt_chan_t c)
 {
-	return NULL;
-}
+	//rcv a chennel from fn_process
+	lwt_chan_t snd_cc = lwt_rcv_chan(c);
 
-int test_speed_create_join()
-{
-	int i=0;
-	unsigned long long start, end;
-	lwt_t tid1, tid2, tid3;
-
-	tid1 = lwt_create(fn, NULL, 0, 0);
-	lwt_join(tid1);
-	IS_RESET();
-
-	rdtscll(start);
-	for(i=0 ; i < ITER; i++)
+	int num = 10;
+	while(num > 0)
 	{
-		tid1 = lwt_create(fn, NULL, 0, 0);
-		lwt_join(tid1);
+		printf("number %d generated.\n", num);
+		lwt_snd(snd_cc, (void*)num);
+		num--;
 	}
-	rdtscll(end);
-	IS_RESET();
-	printf("performance of fork/join: --> %lld\n", (end-start)/ITER);
-
-	for(i=0 ; i < ITER; i++)
-	{
-		tid1 = lwt_create(fn, NULL, 0, 0);
-		tid2 = lwt_create(fn, NULL, 0, 0);
-		tid3 = lwt_create(fn, NULL, 0, 0);
-		lwt_join(tid3);
-		lwt_join(tid1);
-		lwt_join(tid2);
-	}
-
-	IS_RESET();
-
-
-	return 0;
-}
-
-void* fn_bounce(void* data, lwt_chan_t c)
-{
-	lwt_yield(LWT_NULL);
-	int i=0;
-
-	unsigned long long int start, end;
-
-	rdtscll(start);
-	for(i=0 ; i < ITER; i++)
-	{
-		lwt_yield(LWT_NULL);
-	}
-	rdtscll(end);
-
-	if(data)
-		printf("performance of yield: --> %lld\n", (end-start)/(ITER*2));
-
-
-	lwt_yield(LWT_NULL);
-	return NULL;
-}
-
-
-void test_speed_yield()
-{
-	lwt_t tid1, tid2;
-	tid1 = lwt_create(fn_bounce, (void*)1, 0, 0);
-	tid2 = lwt_create(fn_bounce, NULL, 0, 0);
-	lwt_yield(LWT_NULL);
-	lwt_join(tid1);
-	lwt_join(tid2);
-	lwt_yield(LWT_NULL);
-
-	IS_RESET();
-}
-
-
-void* fn_nested_create(void* data, lwt_chan_t c)
-{
-	int param = (int)data;
-	lwt_t id;
-	if(param< 5)
-	{
-		printf("create: %d\n", param);
-		id = lwt_create(fn_nested_create, (void*)(param+1), 0, 0);
-		lwt_yield(id);
-		printf("join: %d\n", param);
-		lwt_join(id);
-	}
-	lwt_yield(LWT_NULL);
 
 	return NULL;
 }
 
-void test_function_basic()
+//fn on many lwt thread on a kthd to process user input
+void* fn_process(void* data, lwt_chan_t c)
 {
-	lwt_t id;
-	IS_RESET();
-	id = lwt_create(fn_nested_create, 0, 0, 0);
-	lwt_yield(LWT_NULL);
-	
+	//this channel will be send to fn_generate
+	lwt_chan_t rcv_cc = lwt_chan(CHAN_SZ);
+	lwt_snd_chan((lwt_chan_t)data, rcv_cc);
 
-	printf("join in parent\n");
-	lwt_join(id);
-	lwt_yield(LWT_NULL);
+	//rcv a channel from fn_print
+	lwt_chan_t snd_cc = lwt_rcv_chan(c);
 
-	IS_RESET();
-}
+	int tmp;
+	while((tmp = (int)lwt_rcv(rcv_cc)))
+	{
+		if(tmp == -1)
+			break;
+		int i=0;
+		for(;i<100;i++)
+		{
+			tmp++;
+			if (i%5==0)
+				lwt_yield(_LWT_NULL);
+		}
 
-
-void *
-fn_chan(void *data, lwt_chan_t c)
-{
-	lwt_chan_t from;
-	lwt_chan_t to = data;
-	int i;
-	
-	from = lwt_chan(0);
-	lwt_snd_chan(to, from);
-	assert(from->snd_cnt);
-	for (i = 0 ; i < ITER ; i++) {
-		lwt_snd(to, (void*)1);
-		assert(2 == (int)lwt_rcv(from));
+		printf("number %d processed\n", tmp);
+		lwt_snd(snd_cc, (void*)tmp);
 	}
-	lwt_chan_deref(from);
-	
 	return NULL;
 }
 
-void
-test_perf_channels(int chsz)
+//fn on a kthd to print processed data
+void* fn_print(void* data, lwt_chan_t c)
 {
-	lwt_chan_t from, to;
-	lwt_t t;
-	int i;
-	unsigned long long start, end;
 
-	assert(_LWT_STAT_RUN == lwt_current()->lwt_status);
-	from = lwt_chan(chsz);
-	assert(from);
-	//lwt_chan_grant(from);
-	t    = lwt_create(fn_chan, from, 0, 0);
-	to   = lwt_rcv_chan(from);
-	assert(to->snd_cnt);
-	rdtscll(start);
-	for (i = 0 ; i < ITER ; i++) {
-		assert(1 == (int)lwt_rcv(from));
-		lwt_snd(to, (void*)2);
+	//this channel will be send to fn_process
+	lwt_chan_t rcv_cc = lwt_chan(CHAN_SZ);
+	lwt_snd_chan((lwt_chan_t)data, rcv_cc);
+
+	int tmp;
+	while((tmp = (int)lwt_rcv(rcv_cc)) != -1)
+	{
+		printf("after calculation, result is: %d\n", tmp);
 	}
-	lwt_chan_deref(to);
-	rdtscll(end);
-	printf("[PERF] %lld <- snd+rcv (buffer size %d)\n", 
-	       (end-start)/(ITER*2), chsz);
-	lwt_join(t);
-}
 
+
+	return NULL;
+}
 
 int main(int argc, char** argv)
 {
-//	IS_RESET();
-//	test_function_basic();
-//	IS_RESET();
-//	test_speed_create_join();
-//	IS_RESET();
-//	test_speed_yield();
-	IS_RESET();
-	test_perf_channels(9);
-	IS_RESET();
+	//main channel used for inter thread communication
+	lwt_chan_t main_c = lwt_chan(CHAN_SZ);
+	
+	lwt_chan_t generate_c = lwt_chan(CHAN_SZ);
+	lwt_kthd_create(&fn_generate, (void*)main_c, generate_c);
+	sleep(1);
 
-	printf("back to main\n");
+	lwt_chan_t process_c = lwt_chan(CHAN_SZ);
+	lwt_kthd_create(&fn_process, (void*)main_c, process_c);
+	sleep(1);
+
+	//fn_process will send a channel to fn_generate:
+	lwt_snd_chan(generate_c, lwt_rcv_chan(main_c));
+	sleep(1);
+
+	lwt_chan_t print_c = lwt_chan(CHAN_SZ);
+	lwt_kthd_create(&fn_print, (void*)main_c, print_c);
+	sleep(1);
+
+	//fn_print will send a channel to fn_process
+	lwt_snd_chan(process_c, lwt_rcv_chan(main_c));
+
+
+	sleep(1);
+
 	return EXIT_SUCCESS;
 }

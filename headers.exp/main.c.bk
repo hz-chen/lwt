@@ -42,7 +42,7 @@ void* fn_process(void* data, lwt_chan_t c)
 		{
 			tmp++;
 			if (i%5==0)
-				lwt_yield(_LWT_NULL);
+				lwt_yield(LWT_NULL);
 		}
 
 		printf("number %d processed\n", tmp);
