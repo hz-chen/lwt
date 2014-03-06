@@ -93,6 +93,7 @@ __thread _lwt_tcb* curr_tcb = NULL;
 //void __lwt_remove_from_rdyq_S(lwt_t target);
 void __lwt_dispatch(_lwt_tcb* next_tcb, _lwt_tcb* curr_tcb);
 void* __lwt_trampoline(void*);
+void __before_main(void) __attribute__((constructor));
 
 
 typedef struct lwt_start_param_struct_t{
@@ -426,6 +427,17 @@ _lwt_tcb* __init_tcb(int id)
 
 
 	return lwt_tmp;
+}
+
+
+inline void
+__before_main(){
+#ifdef DBG
+	printf("in kthd %d: this is the init function before main.\n",
+			kthd_index);
+#endif
+	__init_pool();
+	__init_tcb(0);
 }
 
 
@@ -904,15 +916,6 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 	//0.1
 	_lwt_stat_t status = ((c->receiver->lwt_status));
 
-	if(unlikely((status == _LWT_STAT_DEAD ||
-					status == _LWT_STAT_ZOMB)))
-	{
-#ifdef DBG
-		printf("thread %d in kthd %d: send to channel 0x%08x failed: receiver DEAD!\n",
-				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
-#endif
-		return -1;
-	}
 	//0.2
 	if(unlikely(c->receiver == nil_tcb))
 	{
@@ -923,6 +926,17 @@ __lwt_chan_append_into_data_buf(lwt_chan_t c, void* data_pkt)
 		return -1;
 	}
 
+
+
+	if(unlikely((status == _LWT_STAT_DEAD ||
+					status == _LWT_STAT_ZOMB)))
+	{
+#ifdef DBG
+		printf("thread %d in kthd %d: send to channel 0x%08x failed: receiver DEAD!\n",
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
+#endif
+		return -1;
+	}
 
 	//0.5:
 	//__lwt_chan_triger_evnt(c, LWT_CHAN_RCV);
@@ -1179,6 +1193,7 @@ void* __lwt_kthd_wrapper(void *args)
 	_lwt_tcb* target;
 	//if the list is empty, then we init the root first.
 
+	/*
 	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
 	{
 		lwt_lst_tail=0;
@@ -1189,6 +1204,11 @@ void* __lwt_kthd_wrapper(void *args)
 		__init_tcb(0);
 		curr_tcb=0;
 		curr_tcb = &lwt_lst_root[0];
+	}
+	*/
+	if(curr_tcb == NULL)
+	{
+		__before_main();
 	}
 
 

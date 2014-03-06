@@ -59,7 +59,7 @@ lwt_chan(int sz)
 	if(sz != 0)
 		c->data_buf = (void*)malloc(sizeof(void*) * sz);
 	else
-		c->data_buf = NULL;
+		c->data_buf = nil;
 	c->buf_len = 0;
 	c->buf_sz = sz;
 	c->prod_p = 0;

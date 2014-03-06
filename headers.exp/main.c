@@ -76,11 +76,11 @@ int test_speed_create_join()
 
 void* fn_bounce(void* data, lwt_chan_t c)
 {
-	lwt_yield(LWT_NULL);
 	int i=0;
 
 	unsigned long long int start, end;
 
+	lwt_yield(LWT_NULL);
 	rdtscll(start);
 	for(i=0 ; i < ITER; i++)
 	{
@@ -88,11 +88,9 @@ void* fn_bounce(void* data, lwt_chan_t c)
 	}
 	rdtscll(end);
 
-	if(data)
+	if((int)data == 1)
 		printf("performance of yield: --> %lld\n", (end-start)/(ITER*2));
 
-
-	lwt_yield(LWT_NULL);
 	return NULL;
 }
 
@@ -193,12 +191,12 @@ test_perf_channels(int chsz)
 
 int main(int argc, char** argv)
 {
-//	IS_RESET();
-//	test_function_basic();
-//	IS_RESET();
-//	test_speed_create_join();
-//	IS_RESET();
-//	test_speed_yield();
+	IS_RESET();
+	test_function_basic();
+	IS_RESET();
+	test_speed_create_join();
+	IS_RESET();
+	test_speed_yield();
 	IS_RESET();
 	test_perf_channels(0);
 	IS_RESET();
@@ -206,3 +204,4 @@ int main(int argc, char** argv)
 	printf("back to main\n");
 	return EXIT_SUCCESS;
 }
+

@@ -59,7 +59,7 @@ lwt_chan(int sz)
 	if(sz != 0)
 		c->data_buf = (void*)malloc(sizeof(void*) * sz);
 	else
-		c->data_buf = NULL;
+		c->data_buf = nil;
 	c->buf_len = 0;
 	c->buf_sz = sz;
 	c->prod_p = 0;
@@ -229,6 +229,7 @@ lwt_rcv(lwt_chan_t c)
 	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
 	void* data = __lwt_chan_remove_from_data_buf(c);
 
+	curr_tcb->wait_type = _LWT_WAIT_NOTHING;
 
 #ifdef DBG
 	printf("thread %d in kthd %d: rcved data %d from channel 0x%08x.\n",

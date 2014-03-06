@@ -44,11 +44,7 @@ lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
 {
 	_lwt_tcb* target_tcb;
 	//if the list is empty, then we init the root first.
-	if(curr_tcb == NULL)
-	{
-		__init_pool();
-		__init_tcb(0);
-	}
+	assert(curr_tcb);
 
 	int id = __lwt_get_target();
 	target_tcb = __init_tcb(id);
@@ -222,11 +218,7 @@ void lwt_die(void* retVal)
 
 lwt_t lwt_current(void)
 {
-	if(unlikely(curr_tcb == NULL))
-	{
-		__init_pool();
-		__init_tcb(0);
-	}
+	assert(curr_tcb);
 	return curr_tcb;
 }
 
@@ -282,11 +274,7 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 
 
 	//******************create monitor thread***********/
-	if(curr_tcb == NULL)
-	{
-		__init_pool();
-		__init_tcb(0);
-	}
+	assert(curr_tcb);
 
 	int target_id= __lwt_get_target();
 	_lwt_tcb* target_tcb = __init_tcb(target_id);

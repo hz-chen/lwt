@@ -59,8 +59,6 @@ test_perf(void)
 	unsigned long long start, end;
 
 
-	chld1 = lwt_create(fn_null, NULL, 0, 0);
-	lwt_join(chld1);
 	/* Performance tests */
 	rdtscll(start);
 	for (i = 0 ; i < ITER ; i++) {
