@@ -59,21 +59,21 @@ lwt_chan(int sz)
 	if(sz != 0)
 		c->data_buf = (void*)malloc(sizeof(void*) * sz);
 	else
-		c->data_buf = NULL;
+		c->data_buf = nil;
 	c->buf_len = 0;
 	c->buf_sz = sz;
 	c->prod_p = 0;
 	c->cons_p = 0;
-	c->blocked_senders = nil;
-	c->blocked_senders_last = nil;
+	c->blocked_senders = nil_tcb;
+	c->blocked_senders_last = nil_tcb;
 	c->blocked_len = 0;
 	c->snd_cnt = 0;
 	c->cgrp_snd = NULL;
 	c->cgrp_rcv = NULL;
-	c->receiver = &(lwt_lst_root[current_tid]);
+	c->receiver = curr_tcb;
 
 #ifdef DBG
-	printf("thread %d in kthd %d: channel 0x%08x constructed.\n", current_tid, kthd_index, (unsigned int)c);
+	printf("thread %d in kthd %d: channel 0x%08x constructed.\n", curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 
 	return c;
@@ -82,8 +82,8 @@ lwt_chan(int sz)
 
 /**
  *	Dereferencing channel. If the receiver calls this function, set
- *	c->receiver to _LWT_NULL.
- *	When the c->snd_cnt == 0 && c->receiver == _LWT_NULL, do the following:
+ *	c->receiver to nil_tcb.
+ *	When the c->snd_cnt == 0 && c->receiver == nil_tcb, do the following:
  *	1: recursively free data buf;
  *	2: recursively free senders;
  *	3: free itself.
@@ -93,29 +93,29 @@ lwt_chan(int sz)
 lwt_chan_deref(lwt_chan_t c)
 {
 #ifdef DBG
-	printf("thread %d in kthd %d: derefing channel 0x%08x.\n", current_tid, kthd_index, (unsigned int)c);
+	printf("thread %d in kthd %d: derefing channel 0x%08x.\n", curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 	if(unlikely(c==NULL))
 		return;
 
-	if(c->receiver != NULL && current_tid == c->receiver->lwt_id)
+	if(c->receiver != nil_tcb && curr_tcb == c->receiver)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x receiver derefed.\n",
-				current_tid, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
-		c->receiver = NULL;
+		c->receiver = nil_tcb;
 	}else
 	{
 #ifdef DBG
-		printf("thread %d in kthd %d: channel sender derefed.\n", current_tid, (unsigned int)kthd_self);
+		printf("thread %d in kthd %d: channel sender derefed.\n", curr_tcb->lwt_id, (unsigned int)kthd_self);
 #endif
 		//fo through the dlinked buffer
 		linked_buf* curr = c->senders;
 		linked_buf* prev = c->senders;
 		while(NULL != curr)
 		{
-			if(((_lwt_tcb*)(curr->self))->lwt_id == current_tid)
+			if(((lwt_t)(curr->self))== curr_tcb)
 			{
 				prev->next = curr->next;
 				c->snd_cnt--;
@@ -125,12 +125,12 @@ lwt_chan_deref(lwt_chan_t c)
 			curr = curr->next;
 		}
 	}
-	if(c->snd_cnt == 0 && c->receiver == NULL)
+	if(c->snd_cnt == 0 && c->receiver == nil_tcb)
 	{
 
 #ifdef DBG
 		printf("thread %d in kthd %d: channel 0x%08x deref accepted.\n",
-				current_tid, kthd_index, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 #endif
 	//	assert(c->buf_len == 0);		//no data_buf
 		if(c->buf_len != 0)
@@ -150,7 +150,7 @@ lwt_chan_deref(lwt_chan_t c)
  *	create a data packet, then:
  *	-0.5: assert: data shouldn't be NULL!
  *	1: check channel alive or not 
- *		if receiver == _LWT_NULL
+ *		if receiver == nil_tcb
  *		1.1: return -1
  *	-1.5: construct data packet.
  *	1.6: put data packet into tcb
@@ -166,34 +166,34 @@ lwt_snd(lwt_chan_t c, void* data)
 	//assert( NULL != data);
 
 	//1
-	if (unlikely(c->receiver == NULL))
+	if (unlikely(c->receiver == nil_tcb))
 		return -1;
 
 #ifdef DBG
 	printf("thread %d in kthd %d: sending data %d to thread %d by channel 0x%08x\n", 
-			current_tid, kthd_index, (int)data, c->receiver->lwt_id, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (int)data, c->receiver->lwt_id, (unsigned int)c);
 #endif
 
-	while(unlikely(lwt_lst_root[current_tid].chan_data_useful))
+	while(unlikely(curr_tcb->chan_data_useful))
 	{
 		//while my data is still avaliable, schedule else where
-		lwt_t operand = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 
-		lwt_lst_root[current_tid].lwt_status = _LWT_STAT_RDY;
-		__lwt_append_into_rdyq(current_tid);
-		__lwt_remove_from_rdyq(operand);
-		if(lwt_lst_root[operand].lwt_status != _LWT_STAT_ZOMB)
-			lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
-		__lwt_schedule(operand);
+		curr_tcb->lwt_status = _LWT_STAT_RDY;
+		__lwt_append_into_rdyq(curr_tcb);
+		__lwt_remove_from_rdyq(op_tcb);
+		if(op_tcb->lwt_status != _LWT_STAT_ZOMB)
+			op_tcb->lwt_status = _LWT_STAT_RUN;
+		__lwt_schedule(op_tcb);
 	}
 
-	lwt_lst_root[current_tid].chan_data = data;
-	lwt_lst_root[current_tid].chan_data_useful = 1;
+	curr_tcb->chan_data = data;
+	curr_tcb->chan_data_useful = 1;
 #ifdef DBG
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_SND\n",
-			current_tid, kthd_index, _LWT_WAIT_CHAN_SND);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_SND);
 #endif
-	lwt_lst_root[current_tid].wait_type = _LWT_WAIT_CHAN_SND;
+	curr_tcb->wait_type = _LWT_WAIT_CHAN_SND;
 
 	//2
 	return __lwt_chan_append_into_data_buf(c, data);
@@ -204,7 +204,7 @@ lwt_snd(lwt_chan_t c, void* data)
 /**
  *	receive a data packet from channel, decrypt it and returns 
  *	curresponding content
- *	1: if current_tid != c->receiver, return nil
+ *	1: if curr_tcb != c->receiver, return nil
  *	2: call __lwt_chan_remove_from_data_buf
  *
  */
@@ -213,26 +213,27 @@ lwt_snd(lwt_chan_t c, void* data)
 lwt_rcv(lwt_chan_t c)
 {
 	//1
-	if(unlikely(current_tid != c->receiver->lwt_id))
+	if(unlikely(curr_tcb != c->receiver))
 	{
 		printf("thread %d in kthd %d: current thread %d is not the receiver of channel 0x%08x\n",
-				current_tid, kthd_index, current_tid, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, curr_tcb->lwt_id, (unsigned int)c);
 		return nil;
 	}
 #ifdef DBG
 	printf("thread %d in kthd %d: attempting to rcv on channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_RCV\n",
-			current_tid, kthd_index, _LWT_WAIT_CHAN_RCV);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_RCV);
 #endif
 
-	lwt_lst_root[current_tid].wait_type = _LWT_WAIT_CHAN_RCV;
+	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
 	void* data = __lwt_chan_remove_from_data_buf(c);
 
+	curr_tcb->wait_type = _LWT_WAIT_NOTHING;
 
 #ifdef DBG
 	printf("thread %d in kthd %d: rcved data %d from channel 0x%08x.\n",
-			current_tid, kthd_index, (int)data, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (int)data, (unsigned int)c);
 #endif
 
 	return data;
@@ -243,36 +244,37 @@ lwt_snd_chan(lwt_chan_t sender, lwt_chan_t sendee)
 {
 	assert(sendee && sender);
 
-	if(unlikely(sender->receiver == NULL))
+	if(unlikely(sender->receiver == nil_tcb))
 		return;
 
 #ifdef DBG
 	printf("thread %d in kthd %d: sending channel 0x%08x to thread %d by channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)sendee, sender->receiver->lwt_id, (unsigned int)sender);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)sendee, sender->receiver->lwt_id, (unsigned int)sender);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_SND\n",
-			current_tid, kthd_index, _LWT_WAIT_CHAN_SND);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_SND);
 #endif
 
-	while(unlikely(lwt_lst_root[current_tid].chan_data_useful))
+	while(unlikely(curr_tcb->chan_data_useful))
 	{
 		//while my data is still avaliable, schedule else where
-		lwt_t operand = lwt_rdyq_head;
+		//lwt_t op_tcb = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 
-		lwt_lst_root[current_tid].lwt_status = _LWT_STAT_RDY;
-		__lwt_append_into_rdyq(current_tid);
-		__lwt_remove_from_rdyq(operand);
-		if(lwt_lst_root[operand].lwt_status != _LWT_STAT_ZOMB)
-			lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
-		__lwt_schedule(operand);
+		curr_tcb->lwt_status = _LWT_STAT_RDY;
+		__lwt_append_into_rdyq(curr_tcb);
+		__lwt_remove_from_rdyq(op_tcb);
+		if(op_tcb->lwt_status != _LWT_STAT_ZOMB)
+			op_tcb->lwt_status = _LWT_STAT_RUN;
+		__lwt_schedule(op_tcb);
 	}
 
 
-	lwt_lst_root[current_tid].chan_data = (void*)sendee;
-	lwt_lst_root[current_tid].wait_type = _LWT_WAIT_CHAN_SND;
-	lwt_lst_root[current_tid].chan_data_useful = 1;
+	curr_tcb->chan_data = (void*)sendee;
+	curr_tcb->wait_type = _LWT_WAIT_CHAN_SND;
+	curr_tcb->chan_data_useful = 1;
 
 
-	__lwt_chan_append_into_sndr_buf(sendee, sender->receiver->lwt_id);
+	__lwt_chan_append_into_sndr_buf(sendee, sender->receiver);
 	__lwt_chan_append_into_data_buf(sender, (void*)sendee);
 
 	return;
@@ -282,25 +284,25 @@ lwt_snd_chan(lwt_chan_t sender, lwt_chan_t sendee)
 	inline lwt_chan_t 
 lwt_rcv_chan(lwt_chan_t c)
 {
-	if(unlikely(current_tid != c->receiver->lwt_id))
+	if(unlikely(curr_tcb != c->receiver))
 	{
 		printf("thread %d in kthd %d: current thread %d is not the receiver of channel 0x%08x\n",
-				current_tid, kthd_index, current_tid, (unsigned int)c);
+				curr_tcb->lwt_id, kthd_index, curr_tcb->lwt_id, (unsigned int)c);
 		return NULL;
 	}
 #ifdef DBG
 	printf("thread %d in kthd %d: rcving channel from channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_RCV\n",
-			current_tid, kthd_index, _LWT_WAIT_CHAN_RCV);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_RCV);
 #endif
 
-	lwt_lst_root[current_tid].wait_type = _LWT_WAIT_CHAN_RCV;
+	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
 
 	lwt_chan_t  data_pkt = (lwt_chan_t)__lwt_chan_remove_from_data_buf(c);
 #ifdef DBG
 	printf("thread %d in kthd %d: channel 0x%08x was received through channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int) data_pkt, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) data_pkt, (unsigned int)c);
 #endif
 	return data_pkt;
 }
@@ -312,8 +314,8 @@ lwt_cgrp(void)
 {
 	lwt_cgrp_t cg = (lwt_cgrp_t)calloc(sizeof(struct lwt_cgrp), sizeof(char));
 	cg->cl_len = 0;
-	cg->snd_waiter = _LWT_NULL;
-	cg->rcv_waiter = _LWT_NULL;
+	cg->snd_waiter = nil_tcb;
+	cg->rcv_waiter = nil_tcb;
 
 	cg->snd_prod_p = 0;
 	cg->snd_cons_p = 0;
@@ -342,7 +344,7 @@ lwt_cgrp_free(lwt_cgrp_t cg)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: attempting to free cgrp 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg);
 #endif
 
 	//TODO: This is actually checking the channel length, not the event length. Fix it!
@@ -352,24 +354,24 @@ lwt_cgrp_free(lwt_cgrp_t cg)
 	lwt_t waiter = cg->snd_waiter;
 
 	//TODO: need to check what the waiter is waiting for. Fix it!
-	if((waiter != _LWT_NULL) && (lwt_lst_root[waiter].lwt_status == _LWT_STAT_WAIT))
+	if((waiter != nil_tcb) && (waiter->lwt_status == _LWT_STAT_WAIT))
 	{
-		lwt_lst_root[waiter].lwt_status = _LWT_STAT_RDY;
+		waiter->lwt_status = _LWT_STAT_RDY;
 		__lwt_append_into_rdyq(waiter);
 	}	
 
 	
 	waiter = cg->rcv_waiter;
 
-	if((waiter != _LWT_NULL) && (lwt_lst_root[waiter].lwt_status == _LWT_STAT_WAIT))
+	if((waiter != nil_tcb) && (waiter->lwt_status == _LWT_STAT_WAIT))
 	{
-		lwt_lst_root[waiter].lwt_status = _LWT_STAT_RDY;
+		waiter->lwt_status = _LWT_STAT_RDY;
 		__lwt_append_into_rdyq(waiter);
 	}
 
 #ifdef DBG
 	printf("thread %d in kthd %d: will free cg 0x%08x now\n",
-			current_tid, kthd_index, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg);
 #endif
 
 	free(cg);
@@ -384,7 +386,7 @@ lwt_cgrp_add(lwt_cgrp_t cg, lwt_chan_t c, lwt_chan_dir_t type)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: channel 0x%08x added to cgrp 0x%08x on direction %d\n",
-			current_tid, kthd_index, (unsigned int)c, (unsigned int)cg, type);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c, (unsigned int)cg, type);
 #endif
 	switch(type){
 		case LWT_CHAN_SND:
@@ -417,7 +419,7 @@ lwt_cgrp_rem(lwt_cgrp_t cg, lwt_chan_t c)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: trying to remove channel 0x%08x from cgrp 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)c, (unsigned int)cg);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c, (unsigned int)cg);
 #endif
 	if(c->cgrp_snd == cg)
 		c->cgrp_snd = NULL;
@@ -448,48 +450,47 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 
 #ifdef DBG
 	printf("thread %d in kthd %d: waiting for cgrp 0x%08x on direction %d\n",
-			current_tid, kthd_index, (unsigned int)cg, direction);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg, direction);
 #endif
 
 	int* evnt_cnt = NULL;
-	_lwt_tcb* current_tcb = &(lwt_lst_root[current_tid]);
 
 	if(direction == LWT_CHAN_SND)
 	{
 #ifdef DBG
 		printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CGRP_SND\n",
-				current_tid, kthd_index, _LWT_WAIT_CGRP_SND);
+				curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_SND);
 #endif
-		cg->snd_waiter = current_tid;
+		cg->snd_waiter = curr_tcb;
 		evnt_cnt = &(cg->snd_evnt_cnt);
-		current_tcb->wait_type = _LWT_WAIT_CGRP_SND;
+		curr_tcb->wait_type = _LWT_WAIT_CGRP_SND;
 	}else if (direction == LWT_CHAN_RCV){
 #ifdef DBG
 		printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CGRP_RCV\n",
-				current_tid, kthd_index, _LWT_WAIT_CGRP_RCV);
+				curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_RCV);
 #endif
-		cg->rcv_waiter = current_tid;
+		cg->rcv_waiter = curr_tcb;
 		evnt_cnt = &(cg->rcv_evnt_cnt);
-		current_tcb->wait_type = _LWT_WAIT_CGRP_RCV;
+		curr_tcb->wait_type = _LWT_WAIT_CGRP_RCV;
 
 	}else if (direction == LWT_CHAN_NULL){
 		if(cg->rcv_evnt_cnt > 0){
 #ifdef DBG
 			printf("thread %d in kthd %d: wait on no direction, mark self as wait type %d: _LWT_WAIT_CGRP_RCV\n",
-					current_tid, kthd_index, _LWT_WAIT_CGRP_RCV);
+					curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_RCV);
 #endif
-			cg->rcv_waiter = current_tid;
+			cg->rcv_waiter = curr_tcb;
 			evnt_cnt = &(cg->rcv_evnt_cnt);
-			current_tcb->wait_type = _LWT_WAIT_CGRP_RCV;
+			curr_tcb->wait_type = _LWT_WAIT_CGRP_RCV;
 		}else
 		{
 #ifdef DBG
 			printf("thread %d in kthd %d: wait on no direction, mark self as wait type %d: _LWT_WAIT_CGRP_SND by default\n",
-					current_tid, kthd_index, _LWT_WAIT_CGRP_SND);
+					curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CGRP_SND);
 #endif
-			cg->snd_waiter = current_tid;
+			cg->snd_waiter = curr_tcb;
 			evnt_cnt = &(cg->snd_evnt_cnt);
-			current_tcb->wait_type = _LWT_WAIT_CGRP_SND;
+			curr_tcb->wait_type = _LWT_WAIT_CGRP_SND;
 		}
 	}
 	
@@ -497,19 +498,19 @@ lwt_cgrp_wait(lwt_cgrp_t cg, lwt_chan_dir_t direction)
 
 	while(*evnt_cnt == 0)
 	{
-		lwt_t operand = lwt_rdyq_head;
-		__lwt_remove_from_rdyq(operand);
-		lwt_lst_root[current_tid].lwt_status = _LWT_STAT_RDY;
-		__lwt_append_into_rdyq(current_tid);
-		lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
+		lwt_t op_tcb = lwt_rdyq_head;
+		__lwt_remove_from_rdyq(op_tcb);
+		curr_tcb->lwt_status = _LWT_STAT_RDY;
+		__lwt_append_into_rdyq(curr_tcb);
+		op_tcb->lwt_status = _LWT_STAT_RUN;
 
-		__lwt_schedule(operand);
+		__lwt_schedule(op_tcb);
 	}
 	assert(*evnt_cnt > 0);
 	
 #ifdef DBG
 	printf("thread %d in kthd %d: wait for cgrp 0x%08x returns with evnt_cnt %d\n",
-			current_tid, kthd_index, (unsigned int)cg, *evnt_cnt);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)cg, *evnt_cnt);
 #endif
 
 	return __lwt_chan_consume_evnt(cg, direction);
@@ -521,7 +522,7 @@ lwt_chan_mark_set(lwt_chan_t c, void* mark)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: set mark %d to channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int) mark, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) mark, (unsigned int)c);
 #endif
 	c->mark = mark;
 	
@@ -534,7 +535,7 @@ lwt_chan_mark_get(lwt_chan_t c)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: get mark %d from channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int) c->mark, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) c->mark, (unsigned int)c);
 #endif
 	return c->mark;
 }
@@ -551,36 +552,36 @@ lwt_snd_cdeleg(lwt_chan_t c, lwt_chan_t delegating)
 {
 	assert(c && delegating);
 
-	if(unlikely(c->receiver == NULL))
+	if(unlikely(c->receiver == nil_tcb))
 		return;
 
 #ifdef DBG
 	printf("thread %d in kthd %d: delegating channel 0x%08x to thread %d by channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)delegating, c->receiver->lwt_id, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)delegating, c->receiver->lwt_id, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_SND\n",
-			current_tid, kthd_index, _LWT_WAIT_CHAN_SND);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_SND);
 #endif
 
-	while(unlikely(lwt_lst_root[current_tid].chan_data_useful))
+	while(unlikely(curr_tcb->chan_data_useful))
 	{
 		//while my data is still avaliable, schedule else where
-		lwt_t operand = lwt_rdyq_head;
+		lwt_t op_tcb = lwt_rdyq_head;
 
-		lwt_lst_root[current_tid].lwt_status = _LWT_STAT_RDY;
-		__lwt_append_into_rdyq(current_tid);
-		__lwt_remove_from_rdyq(operand);
-		if(lwt_lst_root[operand].lwt_status != _LWT_STAT_ZOMB)
-			lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
-		__lwt_schedule(operand);
+		curr_tcb->lwt_status = _LWT_STAT_RDY;
+		__lwt_append_into_rdyq(curr_tcb);
+		__lwt_remove_from_rdyq(op_tcb);
+		if(op_tcb->lwt_status != _LWT_STAT_ZOMB)
+			op_tcb->lwt_status = _LWT_STAT_RUN;
+		__lwt_schedule(op_tcb);
 	}
-	lwt_lst_root[current_tid].chan_data = (void*)delegating;
-	lwt_lst_root[current_tid].chan_data_useful = 1;
+	curr_tcb->chan_data = (void*)delegating;
+	curr_tcb->chan_data_useful = 1;
 
 	delegating->receiver = c->receiver;
-	lwt_lst_root[current_tid].wait_type = _LWT_WAIT_CHAN_SND;
+	curr_tcb->wait_type = _LWT_WAIT_CHAN_SND;
 
 
-	__lwt_chan_append_into_sndr_buf(delegating, c->receiver->lwt_id);
+	__lwt_chan_append_into_sndr_buf(delegating, c->receiver);
 	__lwt_chan_append_into_data_buf(c, (void*)delegating);
 
 	return;
@@ -590,23 +591,23 @@ lwt_snd_cdeleg(lwt_chan_t c, lwt_chan_t delegating)
 static inline lwt_chan_t
 lwt_rcv_cdeleg(lwt_chan_t c)
 {
-	if(unlikely(current_tid != c->receiver->lwt_id))
+	if(unlikely(curr_tcb != c->receiver))
 		return NULL;
 #ifdef DBG
 	printf("thread %d in kthd %d: rcving delegating channel from channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int)c);
 	printf("thread %d in kthd %d: mark self as wait type %d: _LWT_WAIT_CHAN_RCV\n",
-			current_tid, kthd_index, _LWT_WAIT_CHAN_RCV);
+			curr_tcb->lwt_id, kthd_index, _LWT_WAIT_CHAN_RCV);
 #endif
 
-	lwt_lst_root[current_tid].wait_type = _LWT_WAIT_CHAN_RCV;
+	curr_tcb->wait_type = _LWT_WAIT_CHAN_RCV;
 
 	lwt_chan_t  data = (lwt_chan_t)__lwt_chan_remove_from_data_buf(c);
 
 
 #ifdef DBG
 	printf("thread %d in kthd %d: channel 0x%08x was received and delegated through channel 0x%08x\n",
-			current_tid, kthd_index, (unsigned int) data, (unsigned int)c);
+			curr_tcb->lwt_id, kthd_index, (unsigned int) data, (unsigned int)c);
 #endif
 	return data;
 

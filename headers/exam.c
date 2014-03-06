@@ -6,7 +6,7 @@
 
 #define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
 
-#define ITER 100000
+#define ITER 1000000
 
 /* 
  * My output on an Intel Core i5-2520M CPU @ 2.50GHz:
@@ -28,13 +28,13 @@ fn_bounce(void *d, lwt_chan_t c)
 	int i;
 	unsigned long long start, end;
 
-	lwt_yield(_LWT_NULL);
-	lwt_yield(_LWT_NULL);
+	lwt_yield(LWT_NULL);
+	lwt_yield(LWT_NULL);
 	rdtscll(start);
-	for (i = 0 ; i < ITER ; i++) lwt_yield(_LWT_NULL);
+	for (i = 0 ; i < ITER ; i++) lwt_yield(LWT_NULL);
 	rdtscll(end);
-	lwt_yield(_LWT_NULL);
-	lwt_yield(_LWT_NULL);
+	lwt_yield(LWT_NULL);
+	lwt_yield(LWT_NULL);
 
 	if (!d) printf("[PERF] %lld <- yield\n", (end-start)/(ITER*2));
 
@@ -59,8 +59,6 @@ test_perf(void)
 	unsigned long long start, end;
 
 
-	chld1 = lwt_create(fn_null, NULL, 0, 0);
-	lwt_join(chld1);
 	/* Performance tests */
 	rdtscll(start);
 	for (i = 0 ; i < ITER ; i++) {
@@ -70,12 +68,14 @@ test_perf(void)
 	rdtscll(end);
 	printf("[PERF] %lld <- fork/join\n", (end-start)/ITER);
 	IS_RESET();
+	
 
 	chld1 = lwt_create(fn_bounce, (void*)1, 0, 0);
 	chld2 = lwt_create(fn_bounce, NULL, 0, 0);
 	lwt_join(chld1);
 	lwt_join(chld2);
 	IS_RESET();
+
 }
 
 void *
@@ -88,8 +88,8 @@ fn_nested_joins(void *d, lwt_chan_t c)
 	lwt_t chld;
 
 	if (d) {
-		lwt_yield(_LWT_NULL);
-		lwt_yield(_LWT_NULL);
+		lwt_yield(LWT_NULL);
+		lwt_yield(LWT_NULL);
 		assert(lwt_info(LWT_INFO_NTHD_RUNNABLE) == 1);
 		lwt_die(NULL);
 	}
@@ -111,7 +111,7 @@ fn_sequence(void *d, lwt_chan_t c)
 		curr  = (curr + 1) % 2;
 		sched[curr] = val;
 		assert(sched[other] != val);
-		lwt_yield(_LWT_NULL);
+		lwt_yield(LWT_NULL);
 	}
 
 	return NULL;
@@ -136,7 +136,7 @@ test_crt_join_sched(void)
 	printf("[TEST] thread creation/join/scheduling\n");
 
 	/* functional tests: scheduling */
-	lwt_yield(_LWT_NULL);
+	lwt_yield(LWT_NULL);
 
 	chld1 = lwt_create(fn_sequence, (void*)1, 0, 0);
 	chld2 = lwt_create(fn_sequence, (void*)2, 0, 0);
@@ -150,7 +150,7 @@ test_crt_join_sched(void)
 	IS_RESET();
 
 	chld1 = lwt_create(fn_null, NULL, 0, 0);
-	lwt_yield(_LWT_NULL);
+	lwt_yield(LWT_NULL);
 	lwt_join(chld1);
 	IS_RESET();
 
@@ -161,8 +161,8 @@ test_crt_join_sched(void)
 	/* functional tests: join only from parents */
 	chld1 = lwt_create(fn_identity, (void*)0x37337, 0, 0);
 	chld2 = lwt_create(fn_join, (void*)chld1, 0, 0);
-	lwt_yield(_LWT_NULL);
-	lwt_yield(_LWT_NULL);
+	lwt_yield(LWT_NULL);
+	lwt_yield(LWT_NULL);
 	lwt_join(chld2);
 	lwt_join(chld1);
 	IS_RESET();
@@ -207,7 +207,7 @@ test_perf_channels(int chsz)
 	int i;
 	unsigned long long start, end;
 
-	assert(_LWT_STAT_RUN == lwt_lst_root[current_tid].lwt_status);
+	assert(_LWT_STAT_RUN == curr_tcb->lwt_status);
 	from = lwt_chan(chsz);
 	assert(from);
 	//lwt_chan_grant(from);
@@ -267,7 +267,7 @@ test_multisend(int chsz)
 	t1 = lwt_create(fn_snder, &args[0], 0, 0);
 	t2 = lwt_create(fn_snder, &args[1], 0, 0);
 	for (i = 0 ; i < ITER*2 ; i++) {
-		//if (i % 5 == 0) lwt_yield(_LWT_NULL);
+		//if (i % 5 == 0) lwt_yield(LWT_NULL);
 		ret[i] = (int)lwt_rcv(c);
 		if (sndrcv_cnt > maxcnt) maxcnt = sndrcv_cnt;
 		sndrcv_cnt--;
@@ -316,7 +316,7 @@ test_perf_async_steam(int chsz)
 	unsigned long long start, end;
 
 	async_sz = chsz;
-	assert(_LWT_STAT_RUN == lwt_lst_root[current_tid].lwt_status);
+	assert(_LWT_STAT_RUN == curr_tcb->lwt_status);
 	from = lwt_chan(chsz);
 	assert(from);
 	//lwt_chan_grant(from);
@@ -340,9 +340,9 @@ fn_grpwait(void *d, lwt_chan_t ppc)
 		if ((i % 7) == 0) {
 			int j;
 
-			for (j = 0 ; j < (i % 8) ; j++) lwt_yield(_LWT_NULL);
+			for (j = 0 ; j < (i % 8) ; j++) lwt_yield(LWT_NULL);
 		}
-		lwt_snd(c, (void*)current_tid);
+		lwt_snd(c, curr_tcb);
 	}
 	return NULL;
 }
@@ -410,12 +410,15 @@ main(void)
 {
 	test_perf();
 	test_crt_join_sched();
-	test_perf_channels(1);
+	test_perf_channels(0);
 	test_multisend(0);
 	test_perf_async_steam(ITER/10 < 100 ? ITER/10 : 100);
 	test_multisend(ITER/10 < 100 ? ITER/10 : 100);
 	test_grpwait(0, 3);
 	test_grpwait(3, 3);
+	/*
+	*/
+
 
 	return 0;
 }

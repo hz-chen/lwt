@@ -44,19 +44,10 @@ lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
 {
 	_lwt_tcb* target_tcb;
 	//if the list is empty, then we init the root first.
-	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
-	{
-		lwt_lst_tail=0;
-		lwt_rdyq_head=_LWT_NULL;
-		lwt_rdyq_tail=_LWT_NULL;
-		lwt_dead_head=_LWT_NULL;
-		lwt_dead_tail=_LWT_NULL;
-		__init_tcb(0);
-		current_tid=0;
-	}
+	assert(curr_tcb);
 
-	lwt_t target = __lwt_get_target();
-	target_tcb = __init_tcb(target);
+	int id = __lwt_get_target();
+	target_tcb = __init_tcb(id);
 	
 	void* bp = target_tcb->lwt_ebp;
 	target_tcb->lwt_esp = target_tcb->lwt_ebp - 12;
@@ -68,39 +59,29 @@ lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
 	target_tcb->flag = flag;
 	target_tcb->lwt_ip =(void*)__lwt_trampoline;
 
-	/*
-	__asm__ __volatile__(
-		"leal __lwt_trampoline, %0\n\t"
-		:"=r"(target_tcb->lwt_ip)
-		:
-		:"eax"
-			);
-			*/
 
-	return target;
+	return target_tcb;
 }
 
 static inline
 void  lwt_yield(lwt_t target)
 {
-	lwt_t operand = current_tid;
-	if(likely(target == _LWT_NULL))
+	_lwt_tcb* op_tcb = target;
+	if(target == nil_tcb)
 	{
 		if(unlikely(length_of_rdyq == 0))
 			return;
 		else
-			operand = lwt_rdyq_head;
+			op_tcb = lwt_rdyq_head;
 
-	}else{
-		operand = target;
 	}
 
-	lwt_lst_root[current_tid].lwt_status = _LWT_STAT_RDY;
-	__lwt_append_into_rdyq(current_tid);
-	__lwt_remove_from_rdyq(operand);
-	if(lwt_lst_root[operand].lwt_status != _LWT_STAT_ZOMB)
-		lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
-	__lwt_schedule(operand);
+	curr_tcb->lwt_status = _LWT_STAT_RDY;
+	__lwt_append_into_rdyq(curr_tcb);
+	__lwt_remove_from_rdyq(op_tcb);
+	if(op_tcb->lwt_status != _LWT_STAT_ZOMB)
+		op_tcb->lwt_status = _LWT_STAT_RUN;
+	__lwt_schedule(op_tcb);
 }
 
 
@@ -109,61 +90,60 @@ void* lwt_join(lwt_t target)
 {
 #ifdef DBG
 	printf("thread %d in kthd %d: trying to join thread %d\n",
-			current_tid, kthd_index, target);
+			curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 
 
-	lwt_t operand = target;
+	_lwt_tcb* target_tcb = target;
+	_lwt_tcb* op_tcb = target_tcb;
 
-	/*
-	if(unlikely(current_tid != lwt_lst_root[target].parent) ||
-		(lwt_lst_root[target].lwt_status == LWT_FLAG_NOJOIN))
+	if(unlikely(curr_tcb != target_tcb->parent) ||
+		(target_tcb->flag == LWT_FLAG_NOJOIN))
 	{
-		lwt_yield(target);
-		return NULL;
-	}
-	*/
-
-	if(unlikely(current_tid != lwt_lst_root[target].parent) ||
-		(lwt_lst_root[target].flag == LWT_FLAG_NOJOIN))
-	{
+#ifdef DBG
+		printf("thread %d in kthd %d: trying to thread %d from non-parent thread, yield\n",
+				curr_tcb->lwt_id, kthd_index, target->lwt_id);
+#endif
 		lwt_yield(target);
 		return NULL;
 	}
 
 
 	num_of_block++;
-	lwt_lst_root[target].joined = current_tid;
+	//lwt_lst_root[target].joined = curr_tcb;
+	target_tcb->joined = curr_tcb;
 
 	do{
-		operand = target;
-		lwt_lst_root[current_tid].lwt_status = _LWT_STAT_WAIT;
-		lwt_lst_root[current_tid].wait_type = _LWT_WAIT_JOIN;
+		op_tcb = target_tcb;
+		curr_tcb->lwt_status = _LWT_STAT_WAIT;
+		curr_tcb->wait_type = _LWT_WAIT_JOIN;
 
-		if (unlikely(lwt_lst_root[target].lwt_status == _LWT_STAT_WAIT))
-			operand = lwt_rdyq_head;
+	//	if (unlikely(lwt_lst_root[target].lwt_status == _LWT_STAT_WAIT))
+		if ((target_tcb->lwt_status == _LWT_STAT_WAIT))
+			op_tcb = lwt_rdyq_head;
 
 #ifdef DBG
 		printf("thread %d in kthd %d: target thread %d is in status %d, pick thread %d as operand.\n",
-				current_tid, kthd_index, target, lwt_lst_root[target].lwt_status, operand);
+				curr_tcb->lwt_id, kthd_index, target_tcb->lwt_id, target_tcb->lwt_status, op_tcb->lwt_id);
 #endif
 
 
-		__lwt_remove_from_rdyq(operand);
+		__lwt_remove_from_rdyq(op_tcb);
 
-		if(lwt_lst_root[operand].lwt_status == _LWT_STAT_RDY)
-			lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
+		if(op_tcb->lwt_status == _LWT_STAT_RDY)
+			op_tcb->lwt_status = _LWT_STAT_RUN;
 
-		__lwt_schedule(operand);
-	}while(lwt_lst_root[target].lwt_status != _LWT_STAT_ZOMB);
+		__lwt_schedule(op_tcb);
+	}while(target_tcb->lwt_status != _LWT_STAT_ZOMB);
 #ifdef DBG
-	printf("thread %d in kthd %d: killing thread %d\n", current_tid, kthd_index, target);
+	printf("thread %d in kthd %d: killing thread %d\n", curr_tcb->lwt_id, kthd_index, target_tcb->lwt_id);
 #endif
 
-	lwt_lst_root[current_tid].lwt_status = _LWT_STAT_RUN;
-	lwt_lst_root[target].lwt_status = _LWT_STAT_DEAD;
+
+	curr_tcb->lwt_status = _LWT_STAT_RUN;
+	op_tcb->lwt_status = _LWT_STAT_DEAD;
 	num_of_block--;
-	void* ret = lwt_lst_root[target].ret_val;
+	void* ret = target_tcb->ret_val;
 	__lwt_append_into_deadq(target);
 	__lwt_free(target);
 	return ret;
@@ -172,12 +152,11 @@ void* lwt_join(lwt_t target)
 
 void lwt_die(void* retVal)
 {
-	lwt_t operand;
-	_lwt_tcb* curr_tcb = &lwt_lst_root[current_tid];
+	_lwt_tcb* op_tcb;
 	curr_tcb->ret_val = retVal;
 	curr_tcb->lwt_status = _LWT_STAT_ZOMB;
 #ifdef DBG
-	printf("thread %d in kthd %d: Now I'm a ZOMBIE!!!\n", current_tid, kthd_index);
+	printf("thread %d in kthd %d: Now I'm a ZOMBIE!!!\n", curr_tcb->lwt_id, kthd_index);
 #endif
 	num_of_zombie++;
 
@@ -185,22 +164,22 @@ void lwt_die(void* retVal)
 	{
 
 		//if someone joined me and that one is waiting for me
-		if(curr_tcb->joined != _LWT_NULL &&
-				lwt_lst_root[curr_tcb->joined].wait_type == _LWT_WAIT_JOIN)
+		if(curr_tcb->joined != nil_tcb&&
+				curr_tcb->joined->wait_type == _LWT_WAIT_JOIN)
 		{
 			num_of_zombie--;
 #ifdef DBG
-			printf("thread %d in kthd %d: I gonna die!!\n", current_tid, kthd_index);
+			printf("thread %d in kthd %d: I gonna die!!\n", curr_tcb->lwt_id, kthd_index);
 #endif
 			//let parent go
-			operand = curr_tcb->parent;
+			op_tcb = curr_tcb->parent;
 
-			if(lwt_lst_root[operand].lwt_status == _LWT_STAT_RDY)
-				__lwt_remove_from_rdyq(operand);
+			if(op_tcb->lwt_status == _LWT_STAT_RDY)
+				__lwt_remove_from_rdyq(op_tcb);
 
-			lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
+			op_tcb->lwt_status = _LWT_STAT_RUN;
 
-			__lwt_schedule(operand);
+			__lwt_schedule(op_tcb);
 		}else
 		{
 			if(unlikely(curr_tcb->flag == LWT_FLAG_NOJOIN))
@@ -208,30 +187,30 @@ void lwt_die(void* retVal)
 
 #ifdef DBG
 			printf("thread %d in kthd %d: I've been flagged with NOJOIN.\n",
-					current_tid, kthd_index);
+					curr_tcb->lwt_id, kthd_index);
 #endif
 
 				curr_tcb->lwt_status = _LWT_STAT_DEAD;
-				__lwt_append_into_deadq(current_tid);
+				__lwt_append_into_deadq(curr_tcb);
 				num_of_zombie--;
-				__lwt_free(current_tid);
+				__lwt_free(curr_tcb);
 			}
 			else
 			{
 #ifdef DBG
 			printf("thread %d in kthd %d: no one joins me.\n",
-					current_tid, kthd_index);
+					curr_tcb->lwt_id, kthd_index);
 #endif
 				curr_tcb->lwt_status = _LWT_STAT_ZOMB;
-				__lwt_append_into_rdyq(current_tid);
+				__lwt_append_into_rdyq(curr_tcb);
 			}
 
-			operand = lwt_rdyq_head;
-			__lwt_remove_from_rdyq(operand);
+			op_tcb = lwt_rdyq_head;
+			__lwt_remove_from_rdyq(op_tcb);
 
-			lwt_lst_root[operand].lwt_status = _LWT_STAT_RUN;
+			op_tcb->lwt_status = _LWT_STAT_RUN;
 
-			__lwt_schedule(operand);
+			__lwt_schedule(op_tcb);
 		}
 	}
 }
@@ -239,7 +218,8 @@ void lwt_die(void* retVal)
 
 lwt_t lwt_current(void)
 {
-	return current_tid;
+	assert(curr_tcb);
+	return curr_tcb;
 }
 
 int lwt_info(lwt_info_t info)
@@ -294,19 +274,10 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 
 
 	//******************create monitor thread***********/
-	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
-	{
-		lwt_lst_tail=0;
-		lwt_rdyq_head=_LWT_NULL;
-		lwt_rdyq_tail=_LWT_NULL;
-		lwt_dead_head=_LWT_NULL;
-		lwt_dead_tail=_LWT_NULL;
-		__init_tcb(0);
-		current_tid=0;
-	}
+	assert(curr_tcb);
 
-	lwt_t target = __lwt_get_target();
-	_lwt_tcb* target_tcb = __init_tcb(target);
+	int target_id= __lwt_get_target();
+	_lwt_tcb* target_tcb = __init_tcb(target_id);
 	
 	void* bp = target_tcb->lwt_ebp;
 	target_tcb->lwt_esp = target_tcb->lwt_ebp - 12;
@@ -323,10 +294,12 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 
 	int tmp_num;
 	int new_num;
+
 	do{
 		tmp_num = kthd_num;
 		new_num = tmp_num + 1;
-	}while(!( g_atomic_int_compare_and_exchange(&kthd_num, tmp_num, new_num)));
+	}while(!( __cas(&kthd_num, tmp_num, new_num)));
+
 	lwt_args_t* args = (lwt_args_t*)malloc(sizeof(lwt_args_t));
 	args->data = data;
 	args->c = c;
@@ -340,5 +313,6 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 
 	return 0;
 }
+
 
 #endif

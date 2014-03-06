@@ -32,19 +32,35 @@ __lwt_trampoline:
 __lwt_dispatch:
 	pushl %ebp 	
 	movl %esp, %ebp
-	pusha				//push 8 registers, takes 32 bytes.
-	movl 0x2c(%esp), %eax		//got curr_tcb, 8 more bytes earlier;
+	subl $0x18, %esp
+	movl %eax, 0x14(%esp)
+	movl %ebx, 0x10(%esp)
+	movl %ecx, 0x0c(%esp)
+	movl %edx, 0x08(%esp)
+	movl %esi, 0x04(%esp)
+	movl %edi, 0x00(%esp)
+
+	movl 0x24(%esp), %eax		//got curr_tcb, 8 more bytes earlier;
 	movl %esp, 0x10(%eax)		//movl %esp, curr_tcb->lwt_esp
 	movl %ebp, 0xc(%eax)		//movl %ebp, curr_tcb->lwt_ebp
 	movl $1f, 0x14(%eax)			//movl %eip, curr_tcb->lwt_eip
-	movl 0x28(%esp), %eax	//got next_tcb
+	movl 0x20(%esp), %eax	//got next_tcb
 	movl 0x10(%eax), %esp	//movl $next_tcb->lwt_esp, %esp
 	movl 0xc(%eax), %ebp 	//movl curr_tcb->lwt_ebp, %ebp
 	movl 0x14(%eax), %ebx	//movl $next_tcb->lwt_eip, %ebx
 	jmp *%ebx
 	1:
-	popa
-	leave
+
+	movl 0x00(%esp), %edi
+	movl 0x04(%esp), %esi
+	movl 0x08(%esp), %edx
+	movl 0x0c(%esp), %ecx
+	movl 0x10(%esp), %ebx
+	movl 0x14(%esp), %eax
+
+	movl %ebp, %esp
+
+	leave	
 	ret
 
 
