@@ -309,7 +309,7 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 	if(c)
 		args->c = c;
 	else
-		args->c = lwt_chan(2);
+		args->c = new lwt_chan(2);
 	args->fn = fn;
 	args->kthd_index = new_num;
 	pthread_create(&(kthds[new_num].kthd_id), NULL, __lwt_kthd_wrapper, args);

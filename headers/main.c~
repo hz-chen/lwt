@@ -31,7 +31,7 @@ int main(int argc, char * argv[])
 	lwt_kthd_create(ThreadAdd, NULL, NULL);
 	lwt_kthd_create(ThreadAdd, NULL, NULL);
 
-	sleep(1);
+	//sleep(3);
 
 	sem_destroy(&sem);
 	if (count < 2 * NITER) 

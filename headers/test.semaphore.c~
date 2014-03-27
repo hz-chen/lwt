@@ -8,38 +8,39 @@
 
 int count = 0;
 
-sem_t sem;
-void * ThreadAdd(void * a, lwt_chan_t c)
+//sem_t sem;
+void * ThreadAdd(void * a)
 {
 
 	int i, tmp;
 	for(i = 0; i < NITER; i++)
 	{
-		sem_wait(&sem);
+//		sem_wait(&sem);
 		tmp = count;      /* copy the global count locally */
 		tmp = tmp+1;      /* increment the local copy */
 		count = tmp;      /* store the local value into the global count */ 
-		sem_post(&sem);
+//		sem_post(&sem);
 	}
+//	sem_destroy(&sem);
 	return NULL;
 }
 
 int main(int argc, char * argv[])
 {
-	sem_init(&sem, 0, 1);
+	lwt_t tid1, tid2;
+//	sem_init(&sem, 0, 1);
 
-	lwt_kthd_create(ThreadAdd, NULL, NULL);
-	lwt_kthd_create(ThreadAdd, NULL, NULL);
+	tid1 = lwt_kthd_create(ThreadAdd, NULL, NULL);
+	tid2 = lwt_kthd_create(ThreadAdd, NULL, NULL);
 
-	sleep(1);
+	sleep(3);
 
-	sem_destroy(&sem);
 	if (count < 2 * NITER) 
 		printf("\n BOOM! count is [%d], should be %d\n", count, 2*NITER);
 	else
 		printf("\n OK! count is [%d]\n", count);
 
-	return EXIT_SUCCESS;
+	pthread_exit(NULL);
 }
 
 
