@@ -23,9 +23,9 @@
 #ifndef __LWT_H__
 #define __LWT_H__
 
-#include "lwt_types.h"
-#include "lwt_core.h"
-#include "lwt_channel.h"
+#include <lwt/lwt_types.h>
+#include <lwt/lwt_core.h>
+#include <lwt/lwt_channel.h>
 
 //auxiliary functions and definitions:
 typedef enum {
@@ -309,7 +309,7 @@ int lwt_kthd_create(lwt_fn_t fn, void *data, lwt_chan_t c)
 	if(c)
 		args->c = c;
 	else
-		args->c = new lwt_chan(2);
+		args->c = lwt_chan(2);
 	args->fn = fn;
 	args->kthd_index = new_num;
 	pthread_create(&(kthds[new_num].kthd_id), NULL, __lwt_kthd_wrapper, args);

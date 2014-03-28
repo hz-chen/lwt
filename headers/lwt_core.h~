@@ -41,6 +41,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+//#include <lwt/lwt_types.h>
 #include "lwt_types.h"
 
 /*****public data structures*****/
@@ -91,9 +92,10 @@ __thread int length_of_deadq = 0;
 __thread _lwt_tcb* curr_tcb = NULL;
 
 //void __lwt_remove_from_rdyq_S(lwt_t target);
-void __lwt_dispatch(_lwt_tcb* next_tcb, _lwt_tcb* curr_tcb);
-void* __lwt_trampoline(void*);
 void __before_main(void) __attribute__((constructor));
+void __lwt_trampoline(void);
+void __lwt_dispatch(_lwt_tcb*, _lwt_tcb*);
+
 
 
 typedef struct lwt_start_param_struct_t{
@@ -102,6 +104,9 @@ typedef struct lwt_start_param_struct_t{
 	lwt_fn_t fn;
 	kthd_t kthd_index;
 }lwt_args_t;
+
+
+
 
 //this function get the next avaliable tcb number
 	static inline
@@ -124,7 +129,6 @@ int __lwt_get_target()
 }
 
 
-
 void* __lwt_start(lwt_fn_t fn, void* data, lwt_chan_t c)
 {
 #ifdef DBG
@@ -138,6 +142,56 @@ void* __lwt_start(lwt_fn_t fn, void* data, lwt_chan_t c)
 	return fn(data, c);
 }
 
+/***************************copied from lwt_core.S***************/
+
+asm ("__lwt_trampoline:\n"
+		"call __lwt_start\n"
+				"pushl %eax\n"
+				"call lwt_die\n"
+				// will cause a fault...you should never get here!
+				"movl $0, %eax\n"
+				"movl (%eax), %ebx\n"
+	);
+	
+/**
+ *	Call this function like __lwt_dispatch(lwt_tcb* next_tcb, lwt_tcb* curr_tcb)
+ */
+asm ("__lwt_dispatch:\n"
+				"pushl %ebp\n"
+				"movl %esp, %ebp\n"
+				"subl $0x18, %esp\n"
+				"movl %eax, 0x14(%esp)\n"
+				"movl %ebx, 0x10(%esp)\n"
+				"movl %ecx, 0x0c(%esp)\n"
+				"movl %edx, 0x08(%esp)\n"
+				"movl %esi, 0x04(%esp)\n"
+				"movl %edi, 0x00(%esp)\n"
+
+				"movl 0x24(%esp), %eax\n"		//got curr_tcb, 8 more bytes earlier;
+				"movl %esp, 0x10(%eax)\n"		//movl %esp, curr_tcb->lwt_esp
+				"movl %ebp, 0xc(%eax)\n"		//movl %ebp, curr_tcb->lwt_ebp
+				"movl $1f, 0x14(%eax)\n"			//movl %eip, curr_tcb->lwt_eip
+				"movl 0x20(%esp), %eax\n"	//got next_tcb
+				"movl 0x10(%eax), %esp\n"	//movl $next_tcb->lwt_esp, %esp
+				"movl 0xc(%eax), %ebp\n" 	//movl curr_tcb->lwt_ebp, %ebp
+				"movl 0x14(%eax), %ebx\n"	//movl $next_tcb->lwt_eip, %ebx
+				"jmp *(%ebx)\n"
+				"1:"
+
+				"movl 0x00(%esp), %edi\n"
+				"movl 0x04(%esp), %esi\n"
+				"movl 0x08(%esp), %edx\n"
+				"movl 0x0c(%esp), %ecx\n"
+				"movl 0x10(%esp), %ebx\n"
+				"movl 0x14(%esp), %eax\n"
+
+				"movl %ebp, %esp\n"
+
+				"leave\n"
+				"ret\n"
+				);
+
+/***************************copied from lwt_core.S***************/
 
 /**
  *	Remove a node from rdyq
@@ -1124,13 +1178,7 @@ void* __lwt_kthd_rbuf_monitor(void *args)
 						curr_tcb->lwt_id, kthd_index, target->lwt_id);
 #endif
 				assert(target != curr_tcb);
-				//		if(target->lwt_status != _LWT_STAT_RDY)
-				//		{
 				target->wait_type = _LWT_WAIT_NOTHING;
-				//			target->lwt_status = _LWT_STAT_RDY;
-				//			__lwt_append_into_rdyq(target);
-				//		}
-				//		target = lwt_rdyq_head;
 				if(target->lwt_status == _LWT_STAT_ZOMB ||
 						target->lwt_status == _LWT_STAT_RDY)
 					__lwt_remove_from_rdyq(target);
@@ -1143,7 +1191,7 @@ void* __lwt_kthd_rbuf_monitor(void *args)
 #endif
 				if(target == curr_tcb)
 					continue;
-				//schedu into target
+				//schedule into target
 				if(target->lwt_status == _LWT_STAT_ZOMB ||
 						target->lwt_status == _LWT_STAT_RDY)
 					__lwt_remove_from_rdyq(target);
@@ -1156,8 +1204,9 @@ void* __lwt_kthd_rbuf_monitor(void *args)
 				return NULL;
 				break;
 			default:
-				perror("unspecified evnt rcved, halt.\n");
-				exit(0);
+				perror("unspecified evnt rcved, ignore.\n");
+				//exit(0);
+				continue;
 
 		}
 
@@ -1195,19 +1244,6 @@ void* __lwt_kthd_wrapper(void *args)
 	_lwt_tcb* target;
 	//if the list is empty, then we init the root first.
 
-	/*
-	if(lwt_lst_root[0].lwt_status == _LWT_STAT_UNINIT)
-	{
-		lwt_lst_tail=0;
-		lwt_rdyq_head=nil_tcb;
-		lwt_rdyq_tail=nil_tcb;
-		lwt_dead_head=nil_tcb;
-		lwt_dead_tail=nil_tcb;
-		__init_tcb(0);
-		curr_tcb=0;
-		curr_tcb = &lwt_lst_root[0];
-	}
-	*/
 	if(curr_tcb == NULL)
 	{
 		__before_main();
@@ -1240,7 +1276,7 @@ void* __lwt_kthd_wrapper(void *args)
 	c->receiver = target;
 
 	//thread 0 will keep checking the kthd_rbuf to get control tokens.
-	__lwt_kthd_rbuf_monitor((void*)nil_tcb);
+	__lwt_kthd_rbuf_monitor((void*)NULL);
 
 
 #ifdef DBG
@@ -1249,6 +1285,10 @@ void* __lwt_kthd_wrapper(void *args)
 
 	return NULL;
 }
+
+
+
+
 
 
 

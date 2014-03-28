@@ -2,7 +2,7 @@
 #include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <lwt.h>
+#include "lwt.h"
 
 #define NITER 1000000
 

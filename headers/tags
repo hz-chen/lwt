@@ -6,9 +6,10 @@
 !_TAG_PROGRAM_VERSION	5.8	//
 ASM_FILES	Makefile	/^ASM_FILES=$(wildcard *.S)$/;"	m
 CAS_H	atomic.h	2;"	d
+CHANN_NULL	lwt_types.h	125;"	d
 COMM_FLAGS	Makefile	/^COMM_FLAGS=-Wall $/;"	m
 DBG_FLAGS	Makefile	/^DBG_FLAGS=-g -DDBG $/;"	m
-GRPSZ	exam.c	371;"	d	file:
+GRPSZ	exam.c	368;"	d	file:
 HEADER_FILES	Makefile	/^HEADER_FILES=$(wildcard *.h)$/;"	m
 IS_RESET	exam.c	54;"	d	file:
 IS_RESET	main.c	26;"	d	file:
@@ -16,17 +17,19 @@ ITER	exam.c	9;"	d	file:
 ITER	main.c	33;"	d	file:
 ITER	main2.c	25;"	d	file:
 ITER2	exam.c	10;"	d	file:
-LIBS	Makefile	/^LIBS=-lpthread$/;"	m
+LIBS	Makefile	/^LIBS=-llwt$/;"	m
 LWT_CHAN_NULL	lwt_types.h	/^	LWT_CHAN_NULL,$/;"	e	enum:__anon6
 LWT_CHAN_RCV	lwt_types.h	/^	LWT_CHAN_RCV,$/;"	e	enum:__anon6
 LWT_CHAN_SND	lwt_types.h	/^	LWT_CHAN_SND,$/;"	e	enum:__anon6
-LWT_FLAG_NOJOIN	lwt_types.h	132;"	d
+LWT_FLAG_NOJOIN	lwt_types.h	137;"	d
 LWT_INFO_NTHD_BLOCKED	lwt.h	/^	LWT_INFO_NTHD_BLOCKED$/;"	e	enum:__anon1
 LWT_INFO_NTHD_RUNNABLE	lwt.h	/^	LWT_INFO_NTHD_RUNNABLE,$/;"	e	enum:__anon1
 LWT_INFO_NTHD_ZOMBIES	lwt.h	/^	LWT_INFO_NTHD_ZOMBIES,$/;"	e	enum:__anon1
 LWT_NULL	lwt_types.h	90;"	d
+NITER	test.semaphore.c	7;"	d	file:
 O_FLAGS	Makefile	/^O_FLAGS=-O3$/;"	m
 PROF_FLAGS	Makefile	/^PROF_FLAGS=-pg -lc -g$/;"	m
+ThreadAdd	test.semaphore.c	/^void * ThreadAdd(void * a, lwt_chan_t c)$/;"	f
 _LWT_CHAN	lwt_types.h	/^	_LWT_CHAN,	\/\/3$/;"	e	enum:__anon3
 _LWT_DIE	lwt_types.h	/^	_LWT_DIE,	\/\/1$/;"	e	enum:__anon3
 _LWT_JOIN	lwt_types.h	/^	_LWT_JOIN,	\/\/0$/;"	e	enum:__anon3
@@ -34,12 +37,12 @@ _LWT_KTHDT_DESTORY	lwt_types.h	/^	_LWT_KTHDT_DESTORY,			\/\/3: end the whole tar
 _LWT_KTHDT_NOTHING	lwt_types.h	/^	_LWT_KTHDT_NOTHING,			\/\/0: by default$/;"	e	enum:__anon4
 _LWT_KTHDT_SCHD	lwt_types.h	/^	_LWT_KTHDT_SCHD,			\/\/2: put target tcb into rdyq$/;"	e	enum:__anon4
 _LWT_KTHDT_UNSET_TYPE	lwt_types.h	/^	_LWT_KTHDT_UNSET_TYPE,		\/\/1: unset wait_type of target thread and put it into rdyq$/;"	e	enum:__anon4
-_LWT_KTHD_EVNT_BUF	lwt_types.h	129;"	d
-_LWT_KTHD_MAX_NUM	lwt_types.h	130;"	d
+_LWT_KTHD_EVNT_BUF	lwt_types.h	134;"	d
+_LWT_KTHD_MAX_NUM	lwt_types.h	135;"	d
 _LWT_MAX_EVNT_SZ	lwt_types.h	73;"	d
 _LWT_REG_NSET	lwt_types.h	70;"	d
-_LWT_SIZE	lwt_types.h	136;"	d
-_LWT_STACK_SIZE	lwt_types.h	127;"	d
+_LWT_SIZE	lwt_types.h	141;"	d
+_LWT_STACK_SIZE	lwt_types.h	132;"	d
 _LWT_STAT_DEAD	lwt_types.h	/^	_LWT_STAT_DEAD,			\/\/4$/;"	e	enum:__anon2
 _LWT_STAT_RDY	lwt_types.h	/^	_LWT_STAT_RDY,			\/\/3$/;"	e	enum:__anon2
 _LWT_STAT_RUN	lwt_types.h	/^	_LWT_STAT_RUN,			\/\/1$/;"	e	enum:__anon2
@@ -71,7 +74,7 @@ __lwt_chan_append_into_sndr_buf	lwt_core.h	/^__lwt_chan_append_into_sndr_buf(lwt
 __lwt_chan_consume_evnt	lwt_core.h	/^lwt_chan_t __lwt_chan_consume_evnt(lwt_cgrp_t cg, lwt_chan_dir_t type)$/;"	f
 __lwt_chan_remove_from_data_buf	lwt_core.h	/^__lwt_chan_remove_from_data_buf(lwt_chan_t c)$/;"	f
 __lwt_chan_triger_evnt	lwt_core.h	/^void __lwt_chan_triger_evnt(lwt_chan_t c, lwt_chan_dir_t type)$/;"	f
-__lwt_dispatch	lwt_core.S	/^__lwt_dispatch:$/;"	l
+__lwt_dispatch	lwt_core.h	/^void  __lwt_dispatch(lwt_tcb* next_tcb, lwt_tcb* curr_tcb)$/;"	f
 __lwt_free	lwt_core.h	/^void __lwt_free(lwt_t target)$/;"	f
 __lwt_get_rdyq_len	lwt_core.h	/^int __lwt_get_rdyq_len()$/;"	f
 __lwt_get_target	lwt_core.h	/^int __lwt_get_target()$/;"	f
@@ -82,10 +85,9 @@ __lwt_kthd_rbuf_write	lwt_core.h	/^__lwt_kthd_rbuf_write(kthd_t index, _lwt_kthd
 __lwt_kthd_wrapper	lwt_core.h	/^void* __lwt_kthd_wrapper(void *args)$/;"	f
 __lwt_remove_from_deadq	lwt_core.h	/^void __lwt_remove_from_deadq()$/;"	f
 __lwt_remove_from_rdyq	lwt_core.h	/^void __lwt_remove_from_rdyq(_lwt_tcb* target)$/;"	f
-__lwt_remove_from_rdyq_S	lwt_core.S	/^__lwt_remove_from_rdyq_S:$/;"	l
 __lwt_schedule	lwt_core.h	/^void  __lwt_schedule(_lwt_tcb* target)$/;"	f
 __lwt_start	lwt_core.h	/^void* __lwt_start(lwt_fn_t fn, void* data, lwt_chan_t c)$/;"	f
-__lwt_trampoline	lwt_core.S	/^__lwt_trampoline:$/;"	l
+__lwt_trampoline	lwt_core.h	/^void  __lwt_trampoline()$/;"	f
 _lwt_kthd_ctrl_t	lwt_types.h	/^}_lwt_kthd_ctrl_t;$/;"	t	typeref:enum:__anon4
 _lwt_sche_caller_t	lwt_types.h	/^}_lwt_sche_caller_t;$/;"	t	typeref:enum:__anon3
 _lwt_stat_t	lwt_types.h	/^}_lwt_stat_t;$/;"	t	typeref:enum:__anon2
@@ -107,6 +109,7 @@ chan_data	lwt_types.h	/^	void* chan_data;	\/\/offset+64		0x3c$/;"	m	struct:_lwt_
 chan_data_useful	lwt_types.h	/^	int chan_data_useful;	\/\/offset + 60$/;"	m	struct:_lwt_tcb_t
 cl_len	lwt_types.h	/^	int cl_len;				\/\/channel list length$/;"	m	struct:lwt_cgrp
 cons_p	lwt_types.h	/^	int prod_p, cons_p;		\/\/producer pointer & consumer pointer.$/;"	m	struct:lwt_channel
+count	test.semaphore.c	/^int count = 0;$/;"	v
 curr	exam.c	/^volatile int curr = 0;$/;"	v
 curr_tcb	lwt_core.h	/^__thread _lwt_tcb* curr_tcb = NULL;$/;"	v
 data	lwt_core.h	/^	void* data;$/;"	m	struct:lwt_start_param_struct_t
@@ -115,8 +118,6 @@ deadq_next	lwt_types.h	/^	_lwt_tcb* deadq_next;		\/\/offset+32		0x1c$/;"	m	struc
 deadq_prev	lwt_types.h	/^	_lwt_tcb* deadq_prev;		\/\/offset+28		0x20$/;"	m	struct:_lwt_tcb_t
 done_init	lwt_types.h	/^	int done_init;$/;"	m	struct:lwt_kthd_tcb
 ebp_base	lwt_types.h	/^	lwt_reg_t ebp_base;	\/\/offset 48		0x30$/;"	m	struct:_lwt_tcb_t
-else_default	lwt_core.S	/^else_default:										\/\/else$/;"	l
-else_tail	lwt_core.S	/^else_tail:$/;"	l
 flag	lwt_types.h	/^	int flag;			\/\/offset + 52$/;"	m	struct:_lwt_tcb_t
 fn	lwt_core.h	/^	lwt_fn_t fn;$/;"	m	struct:lwt_start_param_struct_t
 fn	main.c	/^void* fn(void* data, lwt_chan_t c)$/;"	f
@@ -175,7 +176,7 @@ lwt_chan_deref	lwt_channel.h	/^lwt_chan_deref(lwt_chan_t c)$/;"	f
 lwt_chan_dir_t	lwt_types.h	/^}lwt_chan_dir_t;$/;"	t	typeref:enum:__anon6
 lwt_chan_mark_get	lwt_channel.h	/^lwt_chan_mark_get(lwt_chan_t c)$/;"	f
 lwt_chan_mark_set	lwt_channel.h	/^lwt_chan_mark_set(lwt_chan_t c, void* mark)$/;"	f
-lwt_chan_t	lwt_types.h	/^typedef struct lwt_channel * lwt_chan_t;$/;"	t	typeref:struct:lwt_channel
+lwt_chan_t	lwt_types.h	/^typedef struct lwt_channel* lwt_chan_t;$/;"	t	typeref:struct:lwt_channel
 lwt_channel	lwt_types.h	/^struct lwt_channel{$/;"	s
 lwt_create	lwt.h	/^lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)$/;"	f
 lwt_current	lwt.h	/^lwt_t lwt_current(void)$/;"	f
@@ -213,11 +214,13 @@ main	exam.c	/^main(void)$/;"	f
 main	main.c	/^int main(int argc, char** argv)$/;"	f
 main	main.s	/^main:$/;"	l
 main	main2.c	/^int main(int argc, char** argv)$/;"	f
+main	test.semaphore.c	/^int main(int argc, char * argv[])$/;"	f
 mark	lwt_types.h	/^	void* mark;$/;"	m	struct:lwt_channel
 multisend_arg	exam.c	/^struct multisend_arg {$/;"	s	file:
 next	lwt_types.h	/^	kthd_t next;$/;"	m	struct:lwt_kthd_tcb
 next	lwt_types.h	/^	struct node_t *next;$/;"	m	struct:node_t	typeref:struct:node_t::node_t
 nil	lwt_types.h	/^__thread linked_buf* nil;$/;"	v
+nil_channel	lwt_types.h	/^__thread lwt_chan_t nil_channel;$/;"	v
 nil_evnt	lwt_core.h	/^__thread struct lwt_kthd_evnt nil_evnt;$/;"	v	typeref:struct:lwt_kthd_evnt
 nil_tcb	lwt_types.h	/^__thread _lwt_tcb* nil_tcb;$/;"	v
 node_t	lwt_types.h	/^typedef struct node_t{$/;"	s
@@ -243,6 +246,7 @@ receiver	lwt_types.h	/^	_lwt_tcb* receiver;				\/\/owner & receiver$/;"	m	struct
 ret_val	lwt_types.h	/^	void* ret_val;		\/\/offset 44		0x2c$/;"	m	struct:_lwt_tcb_t
 sched	exam.c	/^volatile int sched[2] = {0, 0};$/;"	v
 self	lwt_types.h	/^	void* self;$/;"	m	struct:node_t
+sem	test.semaphore.c	/^sem_t sem;$/;"	v
 senders	lwt_types.h	/^	linked_buf* senders;		\/\/senders to this channel.$/;"	m	struct:lwt_channel
 snd_cnt	lwt_types.h	/^	int snd_cnt;				\/\/# of senders in this channel?$/;"	m	struct:lwt_channel
 snd_cons_p	lwt_types.h	/^	int snd_prod_p, snd_cons_p;	\/\/producer pointer & consumer pointer.$/;"	m	struct:lwt_cgrp
