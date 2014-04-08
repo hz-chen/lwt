@@ -9,7 +9,7 @@
 *
 * Description:  	contains core functions that are needed
 * 			by the lwt library. This is the core header 
-* 			file, user should not include this one.
+* 			file, no user should include this one.
 *
 * functions:
 *				__lwt_get_target

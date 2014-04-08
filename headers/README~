@@ -18,14 +18,6 @@
 General background: 
 	This is a multi-thread library. I haven't tested all the functions into every detail yet, but at least it's a working library and most functionalities are working :)
 	lwt stands for Light Weighted Thread. They are cooperative scheduled user level threads. All of them are running on single kernel thread and when to stop is in programmer's hand. They are super fast and light-weighted, you can create as much of them as you want. Currently I make it up to 1024 lwt threads per kthread, but I believe it's just the matter of buffer size.
-
-	To make it:
-	sudo make install.
-	Then include :
-	#include <lwt/lwt.h>
-	when compile, add -llwt at the end of command.
-
-
 	Following is the API:
 
 lwt_create: create a lwt user level thread. 
