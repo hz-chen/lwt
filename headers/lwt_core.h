@@ -1,36 +1,36 @@
 /*******************************************
- *
- * Author: Hongzhou Chen - hzchen_cs@gwmail.gwu.edu
- *
- *
- * Last modified:	11-26-2013 22:44
- *
- * Filename:			lwt_core.h
- *
- * Description:  	contains core functions that are needed
- * 			by the lwt library. This is the core header 
- * 			file, no user should include this one.
- *
- * functions:
- *				__lwt_get_target
- *				__lwt_start
- *				__lwt_remove_from_rdyq
- *				__lwt_append_into_rdyq
- *				__lwt_append_into_deadq
- *				__lwt_remove_from_deadq
- *				__init_tcb
- *				__lwt_schedule
- *				__lwt_free
- *				__lwt_get_rdyq_len
- *				__lwt_get_thd_num
- *				-------lwt channel functions------
- *				__lwt_chan_triger_evnt
- *				__lwt_chan_consume_evnt
- *				__lwt_chann_remove_from_data_buf
- *				__lwt_chann_append_into_data_buf
- *				__lwt_chann_append_into_sndr_buf
- *
- ******************************************/
+*
+* Author: Hongzhou Chen - hzchen_cs@gwmail.gwu.edu
+*
+*
+* Last modified:	03-28-2014 13:21
+*
+* Filename:		lwt_core.h
+*
+* Description:  	contains core functions that are needed
+* 			by the lwt library. This is the core header 
+* 			file, user should not include this one.
+*
+* functions:
+*				__lwt_get_target
+*				__lwt_start
+*				__lwt_remove_from_rdyq
+*				__lwt_append_into_rdyq
+*				__lwt_append_into_deadq
+*				__lwt_remove_from_deadq
+*				__init_tcb
+*				__lwt_schedule
+*				__lwt_free
+*				__lwt_get_rdyq_len
+*				__lwt_get_thd_num
+*				-------lwt channel functions------
+*				__lwt_chan_triger_evnt
+*				__lwt_chan_consume_evnt
+*				__lwt_chann_remove_from_data_buf
+*				__lwt_chann_append_into_data_buf
+*				__lwt_chann_append_into_sndr_buf
+*
+******************************************/
 
 #ifndef __LWT_CORE_H__
 #define __LWT_CORE_H__
@@ -94,7 +94,7 @@ __thread _lwt_tcb* curr_tcb = NULL;
 //void __lwt_remove_from_rdyq_S(lwt_t target);
 void __before_main(void) __attribute__((constructor));
 void __lwt_trampoline(void);
-void __lwt_dispatch(_lwt_tcb*, _lwt_tcb*);
+void __lwt_dispatch(_lwt_tcb* next_tcb, _lwt_tcb* curr_tcb);
 
 
 
