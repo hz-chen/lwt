@@ -20,10 +20,8 @@ The kernel threads are relatively heavy, and I also made inter-kthread
 channel for inter-thread communication and we can even pass a user-level
 thread to another kernel thread through the channel.
 
-Making the code requires the glib library. Because in order to maintain the
-high performance, I tried my best to avoid using locks and mutexes while doing
-the inter-kthread communication, so what I did is to use as much atomic 
-operations in the glib as possible.
+Making the code nolonger requires glib library, I wrote atomic.h to defined
+the atomic instructions needed.
 
 This library is not perfect (definitely), and has a lot bugs (of course), and
 is still under construction.
