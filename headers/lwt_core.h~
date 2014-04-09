@@ -92,7 +92,7 @@ extern __thread int length_of_deadq;
 extern __thread _lwt_tcb* curr_tcb;
 
 //void __lwt_remove_from_rdyq_S(lwt_t target);
-static inline void __before_main(void) __attribute__((constructor));
+void __before_main(void) __attribute__((constructor));
 void __lwt_trampoline(void);
 void __lwt_dispatch(_lwt_tcb* next_tcb, _lwt_tcb* curr_tcb);
 
@@ -437,7 +437,7 @@ _lwt_tcb* __init_tcb(int id)
 }
 
 
-void
+static inline void
 __before_main(){
 #ifdef DBG
 	printf("in kthd %d: this is the init function before main.\n",

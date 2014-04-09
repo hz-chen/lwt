@@ -38,6 +38,7 @@
 #define __LWT_CHAN_H__
 
 
+#include <lwt/lwt_core.h>
 #include <lwt/lwt_types.h>
 
 

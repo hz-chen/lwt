@@ -26,7 +26,7 @@
 #include <lwt/lwt_types.h>
 #include <lwt/lwt_channel.h>
 
-//auxiliary function definitions:
+//auxiliary functions and definitions:
 typedef enum {
 	LWT_INFO_NTHD_RUNNABLE,
 	LWT_INFO_NTHD_ZOMBIES,

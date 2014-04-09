@@ -40,4 +40,4 @@ uninstall:
 	rm -rf $(INSTALL_DIR)
 
 clean: 
-	rm -rf exam main final *.o $(LIB_FILE)*
+	rm -rf exam main final *.o $(LIB_FILE)
