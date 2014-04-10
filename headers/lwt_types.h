@@ -90,7 +90,6 @@ extern __thread _lwt_tcb* nil_tcb;
 #define LWT_NULL	nil_tcb
 
 
-
 struct lwt_channel{
 	/*Sender data*/
 	/**buf sz will be 0 in current stage**/

@@ -26,7 +26,7 @@
 #include <lwt/lwt_types.h>
 #include <lwt/lwt_channel.h>
 
-//auxiliary functions and definitions:
+//auxiliary function definitions:
 typedef enum {
 	LWT_INFO_NTHD_RUNNABLE,
 	LWT_INFO_NTHD_ZOMBIES,
@@ -35,8 +35,7 @@ typedef enum {
 
 extern __thread int num_of_zombie;
 extern __thread int num_of_block;
-
-extern int lwt_info(lwt_info_t info);
+extern __thread _lwt_tcb* curr_tcb;
 
 extern lwt_t
 lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c);

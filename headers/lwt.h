@@ -36,8 +36,6 @@ typedef enum {
 extern __thread int num_of_zombie;
 extern __thread int num_of_block;
 
-extern int lwt_info(lwt_info_t info);
-
 extern lwt_t
 lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c);
 

@@ -93,8 +93,8 @@ extern __thread _lwt_tcb* curr_tcb;
 
 //void __lwt_remove_from_rdyq_S(lwt_t target);
 static inline void __before_main(void) __attribute__((constructor));
-void __lwt_trampoline(void);
-void __lwt_dispatch(_lwt_tcb* next_tcb, _lwt_tcb* curr_tcb);
+static void __lwt_trampoline(void);
+static void __lwt_dispatch(_lwt_tcb* next_tcb, _lwt_tcb* curr_tcb);
 
 
 
@@ -340,6 +340,9 @@ __init_pool()
 {
 	lwt_lst_root[0] = *(_lwt_tcb*)calloc(sizeof(_lwt_tcb) * _LWT_SIZE, sizeof(_lwt_tcb));
 	nil_tcb = (_lwt_tcb*)malloc(sizeof(_lwt_tcb));
+	nil_evnt = *(struct lwt_kthd_evnt*)malloc(sizeof(struct lwt_kthd_evnt));
+	nil_evnt.token = _LWT_KTHDT_NOTHING;
+	nil_evnt.target_lwt = 0;
 	nil_channel = (lwt_chan_t)malloc(sizeof(lwt_chan_t));
 	nil_channel->receiver = nil_tcb;
 	lwt_rdyq_head = nil_tcb;

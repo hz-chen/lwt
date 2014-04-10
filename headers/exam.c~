@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include <lwt/lwt.h>
+#include "lwt.h"
+#include "lwt_types.h"
 
 #define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
 
@@ -63,7 +64,7 @@ test_perf(void)
 	lwt_t chld1, chld2;
 	int i;
 	unsigned long long start, end;
-	pthread_t tid;
+//	pthread_t tid;
 
 
 	/* Performance tests */
@@ -225,7 +226,6 @@ test_perf_channels(int chsz)
 	int i;
 	unsigned long long start, end;
 
-	assert(_LWT_STAT_RUN == curr_tcb->lwt_status);
 	from = lwt_chan(chsz);
 	assert(from);
 	//lwt_chan_grant(from);
@@ -334,7 +334,6 @@ test_perf_async_steam(int chsz)
 	unsigned long long start, end;
 
 	async_sz = chsz;
-	assert(_LWT_STAT_RUN == curr_tcb->lwt_status);
 	from = lwt_chan(chsz);
 	assert(from);
 	//lwt_chan_grant(from);

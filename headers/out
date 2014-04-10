@@ -1,28 +1,5 @@
-main.o: In function `fn_bounce':
-main.c:(.text+0x2af): undefined reference to `nil_tcb'
-main.c:(.text+0x2d0): undefined reference to `nil_tcb'
-main.o: In function `test_speed_yield':
-main.c:(.text+0x39b): undefined reference to `nil_tcb'
-main.c:(.text+0x3c1): undefined reference to `nil_tcb'
-main.o: In function `fn_nested_create':
-main.c:(.text+0x4a1): undefined reference to `nil_tcb'
-main.o:main.c:(.text+0x53a): more undefined references to `nil_tcb' follow
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `nil_channel'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `nil_evnt'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `__lwt_start'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `lwt_dead_tail'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `kthd_rbuf_prod'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `kthd_rbuf_len'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `nil'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `lwt_dead_head'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `kthd_self'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `__lwt_trampoline'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `kthd_rbuf_cons'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `kthd_index'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `lwt_rdyq_head'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `kthd_ring_buf'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `__lwt_dispatch'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `lwt_lst_root'
-/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib/liblwt.so: undefined reference to `lwt_rdyq_tail'
-collect2: ld returned 1 exit status
-make: *** [main] Error 1
+lwt_core.c:50: error: invalid initializer
+lwt_core.c:54: warning: initialization makes integer from pointer without a cast
+lwt_core.c:55: warning: initialization makes integer from pointer without a cast
+lwt_core.c:57: error: invalid initializer
+make: *** [exam] Error 1

@@ -32,9 +32,6 @@
 *
 ******************************************/
 
-#ifndef __LWT_CORE_H__
-#define __LWT_CORE_H__
-
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
@@ -49,6 +46,15 @@ struct lwt_kthd_tcb kthds[_LWT_KTHD_MAX_NUM];
 int kthd_num;
 
 /*****private data of thread*****/
+__thread struct lwt_kthd_evnt (*kthd_ring_buf)[_LWT_KTHD_EVNT_BUF] = NULL;
+__thread int kthd_rbuf_cons = 0, 
+		 kthd_rbuf_prod = 0, 
+		 kthd_rbuf_len = 0;
+__thread pthread_t kthd_self = 0;
+__thread kthd_t kthd_index = 0;
+
+__thread _lwt_tcb lwt_lst_root[_LWT_SIZE];
+__thread int lwt_lst_tail = 0;
 
 //the num_of_threads is used to present the number of threads 
 //currently in RDY, RUN, and WAIT status. The locked is to protect
@@ -63,6 +69,13 @@ __thread int length_of_rdyq = 0;
 __thread int length_of_deadq = 0;
 
 __thread _lwt_tcb* curr_tcb = NULL;
+__thread _lwt_tcb* nil_tcb = NULL;
+
+
+__thread lwt_t lwt_rdyq_head = NULL;
+__thread lwt_t lwt_rdyq_tail = NULL;
+__thread lwt_t lwt_dead_head = NULL;
+__thread lwt_t lwt_dead_tail = NULL;
 
 
 
@@ -70,49 +83,49 @@ __thread _lwt_tcb* curr_tcb = NULL;
 
 asm ("__lwt_trampoline:\n"
 		"call __lwt_start\n"
-				"pushl %eax\n"
-				"call lwt_die\n"
-				// will cause a fault...you should never get here!
-				"movl $0, %eax\n"
-				"movl (%eax), %ebx\n"
+		"pushl %eax\n"
+		"call lwt_die\n"
+		// will cause a fault...you should never get here!
+		"movl $0, %eax\n"
+		"movl (%eax), %ebx\n"
 	);
 	
 /**
  *	Call this function like __lwt_dispatch(lwt_tcb* next_tcb, lwt_tcb* curr_tcb)
  */
 asm ("__lwt_dispatch:\n"
-				"pushl %ebp\n"
-				"movl %esp, %ebp\n"
-				"subl $0x18, %esp\n"
-				"movl %eax, 0x14(%esp)\n"
-				"movl %ebx, 0x10(%esp)\n"
-				"movl %ecx, 0x0c(%esp)\n"
-				"movl %edx, 0x08(%esp)\n"
-				"movl %esi, 0x04(%esp)\n"
-				"movl %edi, 0x00(%esp)\n"
+		"pushl %ebp\n"
+		"movl %esp, %ebp\n"
+		"subl $0x18, %esp\n"
+		"movl %eax, 0x14(%esp)\n"
+		"movl %ebx, 0x10(%esp)\n"
+		"movl %ecx, 0x0c(%esp)\n"
+		"movl %edx, 0x08(%esp)\n"
+		"movl %esi, 0x04(%esp)\n"
+		"movl %edi, 0x00(%esp)\n"
 
-				"movl 0x24(%esp), %eax\n"		//got curr_tcb, 8 more bytes earlier;
-				"movl %esp, 0x10(%eax)\n"		//movl %esp, curr_tcb->lwt_esp
-				"movl %ebp, 0xc(%eax)\n"		//movl %ebp, curr_tcb->lwt_ebp
-				"movl $1f, 0x14(%eax)\n"			//movl %eip, curr_tcb->lwt_eip
-				"movl 0x20(%esp), %eax\n"	//got next_tcb
-				"movl 0x10(%eax), %esp\n"	//movl $next_tcb->lwt_esp, %esp
-				"movl 0xc(%eax), %ebp\n" 	//movl curr_tcb->lwt_ebp, %ebp
-				"movl 0x14(%eax), %ebx\n"	//movl $next_tcb->lwt_eip, %ebx
-				"jmp *%ebx\n"
-				"1:"
+		"movl 0x24(%esp), %eax\n"		//got curr_tcb, 8 more bytes earlier;
+		"movl %esp, 0x10(%eax)\n"		//movl %esp, curr_tcb->lwt_esp
+		"movl %ebp, 0xc(%eax)\n"		//movl %ebp, curr_tcb->lwt_ebp
+		"movl $1f, 0x14(%eax)\n"			//movl %eip, curr_tcb->lwt_eip
+		"movl 0x20(%esp), %eax\n"	//got next_tcb
+		"movl 0x10(%eax), %esp\n"	//movl $next_tcb->lwt_esp, %esp
+		"movl 0xc(%eax), %ebp\n" 	//movl curr_tcb->lwt_ebp, %ebp
+		"movl 0x14(%eax), %ebx\n"	//movl $next_tcb->lwt_eip, %ebx
+		"jmp *%ebx\n"
+		"1:"
 
-				"movl 0x00(%esp), %edi\n"
-				"movl 0x04(%esp), %esi\n"
-				"movl 0x08(%esp), %edx\n"
-				"movl 0x0c(%esp), %ecx\n"
-				"movl 0x10(%esp), %ebx\n"
-				"movl 0x14(%esp), %eax\n"
+"movl 0x00(%esp), %edi\n"
+"movl 0x04(%esp), %esi\n"
+"movl 0x08(%esp), %edx\n"
+"movl 0x0c(%esp), %ecx\n"
+"movl 0x10(%esp), %ebx\n"
+"movl 0x14(%esp), %eax\n"
 
-				"movl %ebp, %esp\n"
+"movl %ebp, %esp\n"
 
-				"leave\n"
-				"ret\n"
-				);
+"leave\n"
+"ret\n"
+);
 
 /***************************copied from lwt_core.S***************/
