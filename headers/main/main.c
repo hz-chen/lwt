@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lwt.h"
+#include "../lwt.h"
 
 #define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
 
