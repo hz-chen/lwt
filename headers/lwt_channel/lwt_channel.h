@@ -38,8 +38,8 @@
 
 
 #include <stdlib.h>
-#include "lwt_core.h"
-#include "lwt_types.h"
+#include "../lwt_core/lwt_core.h"
+#include "../lwt_types/lwt_types.h"
 
 
 /**

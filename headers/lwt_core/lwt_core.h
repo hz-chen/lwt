@@ -42,7 +42,7 @@
 #include <unistd.h>
 
 //#include <lwt/lwt_types.h>
-#include "lwt_types.h"
+#include "../lwt_types/lwt_types.h"
 
 /*****public data structures*****/
 

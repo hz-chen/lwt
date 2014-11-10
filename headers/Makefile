@@ -1,20 +1,20 @@
 HEADER_FILES=$(wildcard *.h)
-ASM_FILES=$(wildcard *.S)
-COMM_FLAGS=-Wall 
+COMM_FLAGS=-Wall -m32
 PROF_FLAGS=-pg -lc -g
 DBG_FLAGS=-g -DDBG 
 O_FLAGS=-O3
-LIBS=-llwt
-main: main.c 
-	gcc $^ $(COMM_FLAGS) $(PROF_FLAGS) -o $@ $(LIBS)
+LIBS=-llwt -lpthread
+OUT_PATH=out
+main: main/main.c 
+	gcc $(OUT_PATH)/$^ $(COMM_FLAGS) $(PROF_FLAGS) -o $@ $(LIBS)
 
-exam: $(HEADER_FILES) $(ASM_FILES) exam.c
+exam: $(HEADER_FILES)  exam.c
 	gcc $^ $(COMM_FLAGS) $(DBG_FLAGS) -o $@ $(LIBS)
 
-final: $(HEADER_FILES) $(ASM_FILES) exam.c
+final: $(HEADER_FILES)  exam.c
 	gcc $^ $(COMM_FLAGS) -O3 -o $@ $(LIBS)
 
-install:  $(HEADER_FILES) $(ASM_FILES)
+install:  $(HEADER_FILES) 
 	mkdir -p /usr/include/lwt
 	cp $^ /usr/include/lwt/
 	gcc  $(COMM_FLAGS) -o liblwt.so.1.0 -fPIC $^ -lpthread -shared

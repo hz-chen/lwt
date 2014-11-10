@@ -1,24 +1,21 @@
 /*******************************************
-*
-* Author: Hongzhou Chen - hzchen_cs@gwmail.gwu.edu
-*
-*
-* Last modified:	12-08-2013 22:36
-*
-* Filename:		lwt.h
-*
-* Description: 		contains general user level interfaces
-*
-* functions: 
-* 				lwt_t lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
-* 				int lwt_yield(lwt_t)
-* 				void* lwt_join(lwt_t)
-* 				void lwt_die()
-* 				lwt_t lwt_current(void)
-* 				int lwt_info(lwt_info_t);
-*
-*
-******************************************/
+ *
+ * Author: Hongzhou Chen - hongzhoc@amazon.com
+ * Filename:		lwt.h
+ *
+ * Description: 		contains general user level interfaces
+ *
+ * functions: 
+ * 				lwt_t lwt_create(lwt_fn_t fn, void* data, int flag, lwt_chan_t c)
+ * 				int lwt_yield(lwt_t)
+ * 				void* lwt_join(lwt_t)
+ * 				void lwt_die()
+ * 				lwt_t lwt_current(void)
+ * 				int lwt_info(lwt_info_t);
+ *
+ *
+ *
+ ******************************************/
 
 #ifndef __LWT_H__
 #define __LWT_H__
@@ -27,9 +24,9 @@
 //#include <lwt/lwt_core.h>
 //#include <lwt/lwt_channel.h>
 
-#include "lwt_types.h"
-#include "lwt_core.h"
-#include "lwt_channel.h"
+#include "lwt_types/lwt_types.h"
+#include "lwt_core/lwt_core.h"
+#include "lwt_channel/lwt_channel.h"
 
 //auxiliary functions and definitions:
 typedef enum {
